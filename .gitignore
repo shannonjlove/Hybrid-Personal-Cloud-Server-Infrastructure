@@ -1,0 +1,81 @@
+# ===============================
+# MASTER SAFETY LOCK — DO NOT REMOVE
+# Prevents accidental upload of private life + media + legal files
+# ===============================
+
+# Secrets & credentials
+.env
+.env.*
+*.key
+*.pem
+*.p12
+*.pfx
+*.crt
+*.cer
+*.ovpn
+*.sqlite
+*.db
+*.sql
+secrets/
+**/secrets/
+**/*secret*
+**/*token*
+**/*password*
+**/*credentials*
+
+# Backups / archives
+backups/
+backup/
+archives/
+archive/
+*.zip
+*.7z
+*.rar
+*.tar
+*.tar.gz
+*.tgz
+*.gz
+
+# Media / creative assets (NEVER commit real media)
+media/
+assets/
+footage/
+audio/
+video/
+photos/
+images/
+*.mov
+*.mp4
+*.m4v
+*.avi
+*.mkv
+*.wav
+*.mp3
+*.aiff
+*.flac
+*.psd
+*.ai
+*.indd
+*.idml
+*.prproj
+*.aep
+*.drp
+
+# Legal / private docs
+legal/
+contracts/
+client/
+clients/
+private/
+vault/
+*.pdf
+*.doc
+*.docx
+
+# System junk
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
