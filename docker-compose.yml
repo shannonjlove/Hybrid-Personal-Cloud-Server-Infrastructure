@@ -1,0 +1,92 @@
+# =============================================================================
+# Hybrid Personal Cloud Server Infrastructure
+# Master Docker Compose 2
+ Service Definitions
+# =============================================================================
+# IMPORTANT: This is a sanitized template. Replace all placeholder values
+# with actual configuration before deployment.
+# Never commit real credentials to this repository.
+# =============================================================================
+
+version: "3.9"
+
+services:
+
+  # ---------------------------------------------------------------------------
+  # REVERSE PROXY
+  # ---------------------------------------------------------------------------
+  traefik:
+    image: traefik:latest
+    container_name: traefik
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./02-CONTAINERS/traefik/traefik.yml:/etc/traefik/traefik.yml:ro
+      - ./02-CONTAINERS/traefik/dynamic:/etc/traefik/dynamic:ro
+      - traefik-certs:/letsencrypt
+    labels:
+      - "traefik.enable=true"
+
+  # ---------------------------------------------------------------------------
+  # DOCUMENTATION
+  # ---------------------------------------------------------------------------
+  bookstack:
+    image: lscr.io/linuxserver/bookstack:latest
+    container_name: bookstack
+    restart: unless-stopped
+    environment:
+      - APP_URL=https://docs.shannonjlove.cloud
+      - DB_HOST=bookstack-db
+      - DB_DATABASE=${BOOKSTACK_DB_NAME}
+      - DB_USERNAME=${BOOKSTACK_DB_USER}
+      - DB_PASSWORD=${BOOKSTACK_DB_PASS}
+    volumes:
+      - bookstack-data:/config
+    depends_on:
+      - bookstack-db
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.bookstack.rule=Host(`docs.shannonjlove.cloud`)"
+      - "traefik.http.routers.bookstack.tls.certresolver=letsencrypt"
+
+  bookstack-db:
+    image: mariadb:latest
+    container_name: bookstack-db
+    restart: unless-stopped
+    environment:
+      - MYSQL_ROOT_PASSWORD=${BOOKSTACK_DB_ROOT_PASS}
+      - MYSQL_DATABASE=${BOOKSTACK_DB_NAME}
+      - MYSQL_USER=${BOOKSTACK_DB_USER}
+      - MYSQL_PASSWORD=${BOOKSTACK_DB_PASS}
+    volumes:
+      - bookstack-db-data:/var/lib/mysql
+
+  # ---------------------------------------------------------------------------
+  # PHOTO MANAGEMENT
+  # ---------------------------------------------------------------------------
+  photoprism:
+    image: photoprism/photoprism:latest
+    container_name: photoprism
+    restart: unless-stopped
+    environment:
+      - PHOTOPRISM_ADMIN_PASSWORD=${PHOTOPRISM_ADMIN_PASS}
+      - PHOTOPRISM_SITE_URL=https://photos.shannonjlove.cloud
+    volumes:
+      - photoprism-data:/photoprism/storage
+      - ~/Pictures:/photoprism/originals:ro
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.photoprism.rule=Host(`photos.shannonjlove.cloud`)"
+      - "traefik.http.routers.photoprism.tls.certresolver=letsencrypt"
+
+# =============================================================================
+# VOLUMES
+# =============================================================================
+volumes:
+  traefik-certs:
+  bookstack-data:
+  bookstack-db-data:
+  photoprism-data:
