@@ -1,73 +1,54 @@
-# Hybrid Personal Cloud Server Infrastructure
+# Hybrid Personal Cloud Server Infrastructure (SJL)
 
-A self-hosted, multi-cloud personal infrastructure for file management, documentation, media, and automation — unified through Tailscale mesh networking, Docker containerization, and PARA-based digital organization.
+This repo is the operational blueprint for Shannon J. Love’s hybrid cloud infrastructure: a secure, metadata-driven, automation-first system spanning a public edge VPS (Nexus) and a private ARM compute node (sOs), with S3-compatible object storage as the long-term vault.
 
-## Architecture
+## Core Roles
 
-| Provider | Role | Hostname |
-|----------|------|----------|
-| Hostinger VPS | Primary container host | Nexus |
-| Oracle Cloud | ARM compute | sOs |
-| AWS | Supplemental services | — |
-| GCP | Supplemental services | — |
+### Nexus (Hostinger VPS) — Public Edge / Ingress
+- Primary public-facing node
+- Traefik reverse proxy on 80/443
+- Hosts the portfolio + routing layer + “front door” services
+- Only node that should expose services to the public internet
 
-All services accessible via `*.shannonjlove.cloud` subdomains. Servers connected through Tailscale mesh VPN.
+### sOs (Oracle ARM64) — Private Compute / “The Brain”
+- ARM64 compute for AI, indexing, recognition, automation workers
+- Not publicly exposed
+- Accessed over Tailscale (preferred)
 
-## Repository Structure
+### Storage Layer (S3-compatible: iDrive E2 / similar)
+- Long-term vault for assets, archives, backups
+- PARA-structured buckets / prefixes
+- Designed for portability across providers
 
-```
-Hybrid-Personal-Cloud-Server-Infrastructure/
-│
-├── 00-MASTER-ARCHITECTURE/       # System design and PARA methodology
-│   ├── system-overview.md
-│   ├── infrastructure-map.md
-│   └── para-structure.md
-│
-├── 01-DEPLOYMENT/                # Provider-specific provisioning
-│   ├── hostinger/
-│   ├── oracle/
-│   ├── aws/
-│   └── gcp/
-│
-├── 02-CONTAINERS/                # Docker service configurations
-│   ├── traefik/
-│   ├── bookstack/
-│   ├── photoprism/
-│   ├── stash/
-   ├── hookmark-sync/
-   └── ai-mcp-servers/
-│
-├── 03-AUTOMATION/                # File routing, tagging, versioning
-│   ├── auto-tagging/
-│   ├── versioning/
-│   ├── file-routing/
-│   └── metadata-persistence/
-│
-├── 04-SECURITY/                  # VPN, tunnels, secrets
-│   ├── tailscale/
-│   ├── wireguard/
-│   └── secrets-management/
-│
-├── 05-DOCS/                      # Operational documentation
-│   ├── full-system-manual.md
-│   └── troubleshooting.md
-│
-└── docker-compose.yml            # Master service definitions
-```
+## Networking (Tailscale-First)
+- Tailscale is the default mesh networking layer (MagicDNS recommended)
+- WireGuard retained only as failover / emergency access
+- Goal: everything private by default, public only via Nexus + Traefik
 
-## Key Technologies
+## Container Runtime
+- Podman + podman-compose
+- Podman socket is used for Traefik provider discovery where required
 
-- **Containers**: Docker + Docker Compose
-- **Reverse Proxy**: Traefik (SSL via Let's Encrypt)
-- **Networking**: Tailscale mesh VPN, WireGuard
-- **IaC**: Terraform, Ansible
-- **Automation**: Hazel, shell scripts, LaunchAgents, MCP servers
-- **Documentation**: BookStack (docs.shannonjlove.cloud)
-- **Organization**: PARA methodology
+## Repo Layout (PARA-aligned)
+- `00-MASTER-ARCHITECTURE/` — system overview, infra map, PARA structure
+- `01-DEPLOYMENT/` — node provisioning (Hostinger, Oracle, AWS, GCP)
+- `02-CONTAINERS/` — service modules (Traefik, BookStack, PhotoPrism, Stash, MCP servers)
+- `03-AUTOMATION/` — tagging, routing, metadata persistence, versioning
+- `04-SECURITY/` — Tailscale, WireGuard failover, secrets management
+- `05-DOCS/` — full manual + troubleshooting
 
-## Security
+## Quickstart (Nexus)
+1. Bring up Traefik first
+2. Attach services to `sjl_net`
+3. Route public traffic via Traefik labels
+4. Keep secrets in `.env` (never committed)
 
-> **No real credentials, API keys, tokens, or private keys should ever be committed to this repository.** All sensitive values use environment variables and `.env` files (gitignored).
+## Security Rules (Non-negotiable)
+- No secrets committed to git (API keys, SSH keys, auth tokens)
+- `.env` is local-only
+- Prefer private services behind Tailscale; publish only what must be public
 
----
-*Last updated: February 2026*
+## Troubleshooting
+See:
+- `05-DOCS/troubleshooting.md`
+
