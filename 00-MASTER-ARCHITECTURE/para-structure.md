@@ -1,34 +1,51 @@
 # PARA Structure
 
+> **Authoritative reference:** `00-MASTER-ARCHITECTURE/sjl-para-naming-master.md`
+> This file is an overview. The master document governs all naming, classification, and routing decisions.
+
 ## Digital Organization Methodology
 
-This infrastructure follows the PARA methodology (Projects, Areas, Resources, Archive) across all systems  from file storage to container organization to automation rules.
+This infrastructure follows the PARA methodology (Projects, Areas, Resources, Archive) extended with five additional system categories, applied across all systems — file storage, container organization, cloud object keys, automation rules, and documentation.
 
-### PARA Categories
+## Nine Categories (Current — v8.0, 2026-06-30)
 
-| Category | Definition | Examples |
-|----------|-----------|----------|
-| **Projects** | Active work with a deadline | Fellowship applications, TagBack development |
-| **Areas** | Ongoing responsibilities | Server maintenance, cloud accounts, production work |
-| **Resources** | Reference material | Technical docs, templates, scripts |
-| **Archive** | Inactive/completed items | Past projects, deprecated configs |
+| Six-Digit Code | Category | Definition | Examples |
+|----------------|----------|-----------|----------|
+| `010000` | **INBOX** | Active intake awaiting classification | New downloads, mobile captures |
+| `020000` | **PROJECTS** | Active work with a defined endpoint | Fellowship applications, TagBack development |
+| `030000` | **AREAS** | Ongoing responsibilities, no end date | Server maintenance, cloud accounts, production work |
+| `040000` | **RESOURCES** | Reference material | Technical docs, templates, scripts |
+| `050000` | **ARCHIVES** | Inactive, completed, deprecated | Past projects, deprecated configs |
+| `060000` | **PRIVATE MEDIA** | Restricted personal media | Personal photos, identity documents |
+| `070000` | **SYSTEM AUTOMATION** | Infrastructure, scripts, agents | FileWarden, MCP configs, routing rules |
+| `080000` | **APPLICATION DATA** | App state, registries, indices | DOCID registry, ingest logs |
+| `090000` | **QUARANTINE** | Integrity failures, review holds | Hash mismatches, missing sidecars |
 
-### Application Across Systems
+## Canonical Filename Format (Current)
 
-**File Storage**: Hazel rules (11 PARA-based) automatically route files into the correct category based on naming conventions and metadata.
+```
+[PPPPPP]_YYYY-MM-DD__DOCID__semantic-title__vMAJOR-MINOR__sha8.ext
+```
 
-**Naming Convention**: `YYYY-MM-DD_HH-MM_category-subcategory_description_UUID24.ext`
+The six-digit PARA code is always the **first field** in every governed filename.
 
-**Automation**: 8 shell scripts + LaunchAgents for scheduled PARA-based file routing and organization.
+## Naming Convention History
 
-**Cloud Consolidation**: Reducing 6 cloud storage accounts to 2, organized by PARA structure.
+| Era | Scheme | Status |
+|-----|--------|--------|
+| Pre-June 11, 2026 | Informal | Retired |
+| June 11, 2026 | 10000-90000 sequential five-digit | Legacy alias only |
+| June 19, 2026 (v7.3) | 01000-09000 strict five-digit | Migration source |
+| June 30, 2026 (v8.0) | 010000-090000 six-digit [P][C][SS][NN] | **Current canonical** |
 
-### Tools
+## Tools
 
-- **Hazel**: macOS file automation with PARA-based rules
-- **DeltaWalker**: File comparison/merge for consolidation
-- **Resilio Sync**: P2P sync between devices
-- **Hookmark**: Deep linking with metadata tags
+- **Hazel**: macOS file automation with PARA-based rules (11 rules)
+- **FileWarden** (`071000`): Routing rules and file governance automation
+- **Shell scripts** (`040200`): 8 ingest and routing scripts
+- **LaunchAgents**: Scheduled automation on Mac
+- **Hookmark**: Deep linking with metadata persistence
+- **MCP integrations**: Google Drive, pCloud, iDrive E2
 
 ---
-*Last updated: February 2026*
+*Last updated: 2026-06-30 — see sjl-para-naming-master.md for full standard*

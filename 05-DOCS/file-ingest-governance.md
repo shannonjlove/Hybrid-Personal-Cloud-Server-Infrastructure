@@ -1,10 +1,13 @@
-# shannonjlove.cloud — System File Ingest Workflow Governance & Naming Convention Master Manual
+# shannonjlove.cloud — System File Ingest Workflow Governance Manual
 
 **Owner:** Shannon J. Love  
 **Domain:** shannonjlove.cloud  
-**Status:** Authoritative Reference  
-**Last Updated:** 2026-06-29  
+**Status:** Authoritative Reference — Ingest Workflow  
+**Last Updated:** 2026-06-30  
 **Stored At:** `05-DOCS/file-ingest-governance.md`
+
+> **Naming convention authority:** `00-MASTER-ARCHITECTURE/sjl-para-naming-master.md`
+> This document governs the ingest pipeline and storage routing. The naming master governs the canonical filename format, PARA code assignment, and the Master Allocation Registry.
 
 ---
 
@@ -63,39 +66,37 @@ This manual governs the **03-AUTOMATION** layer and informs:
 
 ## 2. Naming Convention Master Standard
 
-### 2.1 The Canonical Format
+> **This section is a summary.** The authoritative specification, full field definitions, examples, and the Master Allocation Registry live in:
+> `00-MASTER-ARCHITECTURE/sjl-para-naming-master.md`
+
+### 2.1 The Canonical Format (v8.0 — Current)
 
 ```
-YYYY-MM-DD_HH-MM_CATEGORY-subcategory_description_UUID24.ext
+[PPPPPP]_YYYY-MM-DD__DOCID__semantic-title__vMAJOR-MINOR__sha8.ext
 ```
 
-Every field is mandatory. No field may be omitted or reordered.
+The **six-digit PARA code** is always the first field. Field delimiters are double underscores `__`. Every field is mandatory.
 
-### 2.2 Field Definitions
+| Field | Example | Description |
+|-------|---------|-------------|
+| `[PPPPPP]` | `020000` | Six-digit PARA classification code |
+| `YYYY-MM-DD` | `2026-06-30` | ISO 8601 file creation date |
+| `DOCID` | `sjl-doc-00417` | Permanent artifact identity — never changes across versions |
+| `semantic-title` | `tagback-api-spec` | Lowercase hyphen-slug, ≤60 chars |
+| `vMAJOR-MINOR` | `v2-1` | Content revision version |
+| `sha8` | `a3f9c2b1` | First 8 hex chars of SHA-256 |
+| `.ext` | `.pdf` | Lowercase file extension |
 
-#### Field 1 — Date: `YYYY-MM-DD`
-- ISO 8601 date of **file creation** (not ingest date, not modification date)
-- For ingested files with unknown origin dates, use ingest date
-- Separator: hyphen (`-`)
-- Example: `2026-06-29`
+### 2.2 Four Components — Keep Distinct
 
-#### Field 2 — Time: `HH-MM`
-- 24-hour local time of file creation, hyphen-separated
-- For files where time is unknown or irrelevant (e.g. bulk imports), use `00-00`
-- Example: `14-30`
+| Component | Changes When |
+|-----------|-------------|
+| PARA code | Lifecycle state changes |
+| DOCID | **Never** — same across all versions |
+| Version | Content changes |
+| sha8 | Bytes change |
 
-#### Field 3 — Category + Subcategory: `CATEGORY-subcategory`
-- CATEGORY is one of the four PARA roots: `PROJECTS`, `AREAS`, `RESOURCES`, `ARCHIVE`
-- Subcategory is a fixed-vocabulary slug (see Section 3)
-- Separator between category and subcategory: hyphen (`-`)
-- All lowercase for subcategory; CATEGORY is uppercase
-- Example: `PROJECTS-tagback`, `AREAS-server`, `RESOURCES-templates`
-
-#### Field 4 — Description: `description`
-- Human-readable slug describing the file content
-- Lowercase only, words separated by hyphens
-- Maximum 60 characters
-- No special characters except hyphens
+### 2.3 Field Definitions (Summary)
 - Be specific enough to identify the file without opening it
 - Example: `traefik-config-updated`, `quarterly-invoice-q2`, `photo-shoot-golden-gate`
 
