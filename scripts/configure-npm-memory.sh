@@ -33,7 +33,7 @@ if [[ -f "${REPO_ROOT}/.env" ]]; then
   set +o allexport
 fi
 
-NPM_URL="${NPM_URL:-http://localhost:81}"
+NPM_URL="${NPM_URL:-http://shannonjlove.tail179603.ts.net:81}"
 DOMAIN="${DOMAIN:-memory.shannonjlove.cloud}"
 UPSTREAM_HOST="${UPSTREAM_HOST:-127.0.0.1}"
 UPSTREAM_PORT="${UPSTREAM_PORT:-9077}"

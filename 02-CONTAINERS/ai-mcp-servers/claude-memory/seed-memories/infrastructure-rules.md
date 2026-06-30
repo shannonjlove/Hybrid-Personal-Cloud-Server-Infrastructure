@@ -9,9 +9,11 @@
 ## Reverse proxy
 - ALWAYS use **Nginx Proxy Manager** for reverse proxy and SSL
 - NEVER reference Traefik — this stack does not use Traefik
-- NPM web UI: http://localhost:81 (Nexus only)
+- NPM web UI: http://shannonjlove.tail179603.ts.net:81 (via Tailscale)
+- NPM login email: shannonjlove@mac.com
+- NPM password lives in .env on each server (gitignored) — never hardcoded
 - Proxy hosts are configured via API script: scripts/configure-npm-memory.sh
-- NPM credentials come from .env (gitignored) — never hardcoded
+- Credentials loaded automatically from .env by all install scripts
 
 ## Node roles
 - Nexus (Hostinger VPS, x86_64): primary host, public-facing, NPM, all public subdomains
