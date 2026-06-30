@@ -15,6 +15,7 @@ Environment=TITLE=Shannon Cloud Desktop
 Volume=webtop-data.volume:/config
 Volume=/etc/infra/webtop/mcp-config.json:/config/.config/Claude/claude_desktop_config.json:ro
 Volume=/etc/infra/webtop/init/install-uv.sh:/config/custom-cont-init.d/install-uv.sh:ro
+Volume=/etc/infra/webtop/init/install-media-tools.sh:/config/custom-cont-init.d/install-media-tools.sh:ro
 ShmSize=1g
 Network=webtop.network
 Network=infra.network

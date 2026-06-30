@@ -19,6 +19,10 @@
     },
     "cloudflare": {
       "url": "https://mcp.cloudflare.com/mcp"
+    },
+    "mediaProcessor": {
+      "command": "npx",
+      "args": ["-y", "mcp-media-processor@latest"]
     }
   }
 }
