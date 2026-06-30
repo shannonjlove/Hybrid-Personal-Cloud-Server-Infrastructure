@@ -1,0 +1,15 @@
+[Unit]
+Description=Daily WebTop configuration backup timer
+
+[Timer]
+# Fire daily at 02:30; systemd spreads actual start by up to 15 min
+# to reduce resource contention when multiple timers share the same host.
+OnCalendar=*-*-* 02:30:00
+RandomizedDelaySec=15min
+
+# Run immediately on next boot if the last scheduled run was missed
+# (e.g. VM was powered off at backup time).
+Persistent=true
+
+[Install]
+WantedBy=timers.target

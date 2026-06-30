@@ -1,0 +1,22 @@
+[Unit]
+Description=SJL WebTop Configuration Export (Daily Backup)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/sjl-webtop-backup.sh
+StandardOutput=journal
+StandardError=journal
+
+# Run at lowest scheduler priority to avoid impacting the live WebTop container
+Nice=19
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+
+# Sandbox: restrict writes to only the paths this script actually needs
+ProtectSystem=full
+ReadWritePaths=/srv/sjl/300000_AREAS/390000_oracle-webtop/config
+ReadWritePaths=/srv/sjl/500000_ARCHIVES/590000_oracle-webtop-backups
+PrivateTmp=true
+NoNewPrivileges=true
