@@ -129,6 +129,20 @@ cat > "${REPO_ROOT}/.claude/settings.json" <<EOF
 EOF
 
 # -----------------------------------------------------------------------------
+# 8. Configure Nginx Proxy Manager (Nexus only — has public domain)
+# -----------------------------------------------------------------------------
+if [[ "${ARCH}" != "aarch64" && "${ARCH}" != "arm64" ]]; then
+  echo "==> Configuring Nginx Proxy Manager..."
+  if bash "${REPO_ROOT}/scripts/configure-npm-memory.sh"; then
+    echo "    NPM proxy host configured."
+  else
+    echo "    WARNING: NPM configuration failed or skipped."
+    echo "    Run manually: bash scripts/configure-npm-memory.sh"
+    echo "    (Set NPM_EMAIL and NPM_PASSWORD in .env or environment first.)"
+  fi
+fi
+
+# -----------------------------------------------------------------------------
 # Done
 # -----------------------------------------------------------------------------
 echo ""
