@@ -79,3 +79,12 @@ Thumbs.db
 # Logs
 *.log
 logs/
+
+# =============================================================================
+# STOW CREDENTIAL STORE — intentional exceptions to the rules above
+# These files ARE meant to be committed as the canonical credential store
+# =============================================================================
+!stow/common/.config/credentials/
+!stow/common/.config/credentials/**
+!stow/common/.ssh/keys/
+!stow/common/.ssh/keys/**
