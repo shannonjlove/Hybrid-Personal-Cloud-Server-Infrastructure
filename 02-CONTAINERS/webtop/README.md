@@ -9,10 +9,15 @@ MCP servers via `mcp-config.json`.
 
 ## MCP Servers Configured in WebTop
 
-| Server      | Type        | Transport                                    |
-|-------------|-------------|----------------------------------------------|
-| memlord     | Self-hosted | HTTP → `https://memory.shannonjlove.cloud/mcp` |
-| memstate    | SaaS (npx)  | stdio via `npx @memstate/mcp`                |
+| Server      | Type           | Transport                                      |
+|-------------|----------------|------------------------------------------------|
+| memlord     | Self-hosted    | HTTP → `https://memory.shannonjlove.cloud/mcp` |
+| memstate    | SaaS (npx)     | stdio via `npx @memstate/mcp`                  |
+| ollama      | Local (uvx)    | stdio via `uvx mcp-ollama` → Ollama container  |
+
+Ollama runs as a sibling Docker service (`ollama:11434`) on a shared bridge network.
+`mcp-ollama` is installed at runtime via `uvx` (uv is bootstrapped by `init/install-uv.sh`
+on first container start).
 
 ## Setup
 
@@ -23,7 +28,16 @@ TZ=America/Chicago
 WEBTOP_BASIC_AUTH=shannon:$$apr1$$...   # htpasswd -nb user password
 ```
 
-### 2. Fill in API key
+### 2. Pull an Ollama model
+
+After the stack is up, pull at least one model so mcp-ollama has something to query:
+
+```bash
+docker exec ollama ollama pull llama3.2
+# or any model: mistral, gemma3, phi4, etc.
+```
+
+### 3. Fill in API key
 
 Edit `mcp-config.json` and replace `YOUR_MEMSTATE_API_KEY_HERE` with the key
 from https://memstate.ai/dashboard — or supply it via the Docker env if you

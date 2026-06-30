@@ -9,6 +9,13 @@
       "env": {
         "MEMSTATE_API_KEY": "YOUR_MEMSTATE_API_KEY_HERE"
       }
+    },
+    "ollama": {
+      "command": "uvx",
+      "args": ["mcp-ollama"],
+      "env": {
+        "OLLAMA_HOST": "http://ollama:11434"
+      }
     }
   }
 }

@@ -4,6 +4,9 @@
 #
 # Includes Claude Desktop + Node.js for MCP tool support.
 # MCP config is bind-mounted from ./mcp-config.json
+#
+# Ollama runs as a sibling service on the shared `webtop-net` network.
+# mcp-ollama (uvx) inside WebTop reaches it at http://ollama:11434
 
 services:
 
@@ -21,7 +24,13 @@ services:
     volumes:
       - webtop-data:/config
       - ./mcp-config.json:/config/.config/Claude/claude_desktop_config.json:ro
+      - ./init/install-uv.sh:/config/custom-cont-init.d/install-uv.sh:ro
     shm_size: "1gb"
+    networks:
+      - webtop-net
+      - default
+    depends_on:
+      - ollama
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.webtop.rule=Host(`desktop.shannonjlove.cloud`)"
@@ -30,5 +39,27 @@ services:
       - "traefik.http.routers.webtop.middlewares=webtop-auth"
       - "traefik.http.middlewares.webtop-auth.basicauth.users=${WEBTOP_BASIC_AUTH}"
 
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    restart: unless-stopped
+    volumes:
+      - ollama-data:/root/.ollama
+    networks:
+      - webtop-net
+    # GPU support (uncomment if the host has NVIDIA drivers + nvidia-container-toolkit):
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+
 volumes:
   webtop-data:
+  ollama-data:
+
+networks:
+  webtop-net:
+    driver: bridge
