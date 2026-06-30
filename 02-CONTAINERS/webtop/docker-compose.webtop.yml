@@ -1,0 +1,55 @@
+# =============================================================================
+# WebTop — Operator Desktop Container
+# Provides browser-accessible Linux desktop for Claude Code + MCP operations.
+# =============================================================================
+# Deploy: docker compose -f docker-compose.webtop.yml up -d
+# Access: https://webtop.shannonjlove.cloud  OR  http://<tailscale-ip>:3000
+#
+# Required environment variables (set in .env or Docker secrets — never commit):
+#   WEBTOP_PASSWORD          Desktop/VNC password
+#   SJL_MCP_WRITE_TOKEN      Write-approval token for the MCP gateway
+#   SJL_WRITE_APPROVAL_TOKEN Secondary approval token
+# =============================================================================
+
+version: "3.9"
+
+services:
+
+  webtop:
+    image: lscr.io/linuxserver/webtop:ubuntu-kde
+    container_name: webtop
+    security_opt:
+      - seccomp:unconfined
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=America/Chicago
+      - SUBFOLDER=/                         # Change if running behind a path prefix
+      - TITLE=SJL Operator Desktop
+      # MCP write tokens — inject at runtime, never store in repo
+      - SJL_MCP_WRITE_TOKEN=${SJL_MCP_WRITE_TOKEN}
+      - SJL_WRITE_APPROVAL_TOKEN=${SJL_WRITE_APPROVAL_TOKEN}
+    volumes:
+      - webtop-config:/config
+      # Bootstrap script and MCP config (read-only mount from this repo)
+      - ./config/setup-claude-code.sh:/config/Desktop/setup-claude-code.sh:ro
+      - ./config/claude-code-mcp.json:/config/.claude-code-mcp-template.json:ro
+      # SSH key for Hostinger VPS (mount from host — never commit the key)
+      - ${SSH_KEY_PATH:-/root/.ssh/sjl_hostinger}:/config/.ssh/sjl_hostinger:ro
+    ports:
+      - "3000:3000"    # HTTP (KasmVNC)
+      - "3001:3001"    # HTTPS (KasmVNC)
+    restart: unless-stopped
+    shm_size: "1gb"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.webtop.rule=Host(`webtop.shannonjlove.cloud`)"
+      - "traefik.http.routers.webtop.entrypoints=websecure"
+      - "traefik.http.routers.webtop.tls.certresolver=letsencrypt"
+      - "traefik.http.services.webtop.loadbalancer.server.port=3000"
+      # Restrict to Tailscale subnet — adjust CIDR to match your tailnet
+      - "traefik.http.middlewares.webtop-ipallow.ipallowlist.sourcerange=100.64.0.0/10,127.0.0.1/32"
+      - "traefik.http.routers.webtop.middlewares=webtop-ipallow"
+
+volumes:
+  webtop-config:
