@@ -722,9 +722,12 @@ PY
 
     # Preserve the active working directory and runtime environment.
     # Override common port/host variables only for the staging process.
+    # PYTHONPATH includes WORKDIR so local sibling modules (e.g. gcp_tools)
+    # are importable even though server.py runs from a temp directory.
     (
         cd "$WORKDIR"
         env \
+            PYTHONPATH="${WORKDIR}:${PYTHONPATH:-}" \
             PORT="$STAGE_PORT" \
             MCP_PORT="$STAGE_PORT" \
             SJL_MCP_PORT="$STAGE_PORT" \
