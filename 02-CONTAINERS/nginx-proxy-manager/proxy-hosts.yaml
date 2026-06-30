@@ -1,0 +1,103 @@
+# NPM Proxy Hosts — shannonjlove.cloud
+# Source: Nginx Proxy Manager on Nexus (Hostinger VPS, 72.61.74.250)
+# Admin UI: http://nexus.shannonjlove.cloud:81
+# Last verified: 2026-06-30
+# All hosts: Public visibility, Online status
+
+proxy_hosts:
+
+  - domain: agent.shannonjlove.cloud
+    destination: http://10.88.0.88:80
+    ssl: lets_encrypt
+    created: "2026-06-04T21:12:17Z"
+
+  - domain: bookstack.shannonjlove.cloud
+    destination: http://bookstack:80
+    ssl: lets_encrypt
+    created: "2026-06-17T17:40:45Z"
+    notes: BookStack documentation wiki
+
+  - domain: claudedashboard.shannonjlove.cloud
+    destination: http://claudedashboard.shannonjlove.cloud:80
+    ssl: lets_encrypt
+    created: "2026-06-07T18:55:07Z"
+
+  - domain: dashboard.shannonjlove.cloud
+    destination: http://72.61.74.250:80
+    ssl: http_only
+    created: "2026-06-04T21:19:52Z"
+    notes: HTTP only — no SSL
+
+  - domain: docs.shannonjlove.cloud
+    destination: http://10.91.0.12:8000
+    ssl: lets_encrypt
+    created: "2026-06-04T21:21:28Z"
+    notes: Paperless-ngx document management
+
+  - domain: filebrowser.shannonjlove.cloud
+    destination: http://10.88.0.1:8788
+    ssl: lets_encrypt
+    created: "2026-06-08T00:16:26Z"
+
+  - domain: github-mcp.shannonjlove.cloud
+    destination: http://10.89.2.9:8082
+    ssl: lets_encrypt
+    created: "2026-06-05T16:57:18Z"
+
+  - domain: hostinger-mcp.shannonjlove.cloud
+    destination: http://sjl-hostinger-mcp:8000
+    ssl: lets_encrypt
+    created: "2026-06-05T01:22:38Z"
+
+  - domain: jellyfin.shannonjlove.cloud
+    destination: http://host.containers.internal:8096
+    ssl: lets_encrypt
+    created: "2026-06-22T00:04:50Z"
+    notes: Media server
+
+  - domain: mcp.shannonjlove.cloud
+    destination: http://10.88.0.16:7300
+    ssl: lets_encrypt
+    created: "2026-06-04T14:27:09Z"
+
+  - domain: n8n.shannonjlove.cloud
+    destination: http://10.89.2.182:5678
+    ssl: lets_encrypt
+    created: "2026-06-12T21:37:07Z"
+    notes: Workflow automation
+
+  - domain: oracle-mcp.shannonjlove.cloud
+    destination: http://sjl-oracle-mcp:8000
+    ssl: lets_encrypt
+    created: "2026-06-19T05:27:06Z"
+
+  - domain: push.shannonjlove.cloud
+    destination: http://72.61.74.250:8787
+    ssl: lets_encrypt
+    created: "2026-06-17T19:47:31Z"
+
+  - domain: rclonegui.shannonjlove.cloud
+    destination: http://rclone-gui:5572
+    ssl: lets_encrypt
+    created: "2026-06-26T04:46:39Z"
+    notes: rclone web UI
+
+  - domain: sjl-mcp.shannonjlove.cloud
+    destination: http://72.61.74.250:8797
+    ssl: lets_encrypt
+    created: "2026-06-18T15:15:59Z"
+
+  - domain: ticktick-mcp.shannonjlove.cloud
+    destination: http://10.89.2.1:8766
+    ssl: lets_encrypt
+    created: "2026-06-19T14:15:31Z"
+
+  - domain: webtop.shannonjlove.cloud
+    destination: http://100.67.229.94:3000
+    ssl: lets_encrypt
+    created: "2026-06-21T22:06:55Z"
+    notes: >
+      WebTop (Ubuntu MATE desktop) on Oracle sOs ARM64.
+      Routes via Tailscale: Hostinger NPM → 100.67.229.94:3000.
+      WebSocket support required. proxy_read_timeout 3600s.
+      TLS cert valid Jun 21 – Sep 19, 2026.
