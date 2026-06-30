@@ -1,0 +1,18 @@
+{
+  "mcpServers": {
+    "claude-memory": {
+      "command": "python3",
+      "args": ["${HOME}/.local/lib/claude-memory/server.py"],
+      "env": {
+        "MEMORY_ROOT": "${HOME}/.claude/memories"
+      }
+    },
+    "ai-memory": {
+      "command": "ai-memory",
+      "args": ["mcp", "--tier", "semantic"],
+      "env": {
+        "AI_MEMORY_DB": "${HOME}/.claude/ai-memory.db"
+      }
+    }
+  }
+}
