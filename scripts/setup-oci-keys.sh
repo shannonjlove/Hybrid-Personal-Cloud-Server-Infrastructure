@@ -11,11 +11,14 @@
 #   7. Re-run with all vars set to deploy
 #
 # Usage:
-#   OCI_USER_OCID="ocid1.user.oc1..aaa..." \
-#   OCI_TENANCY_OCID="ocid1.tenancy.oc1..aaa..." \
-#   OCI_FINGERPRINT="xx:xx:xx:xx:xx:xx:xx:xx:xx:xx:xx:xx:xx:xx:xx:xx" \
-#   OCI_REGION="us-ashburn-1" \
-#   bash scripts/setup-oci-keys.sh
+#   Step 1 — generate keys (no vars needed, user/tenancy pre-filled):
+#     bash scripts/setup-oci-keys.sh
+#     → copy the printed public key, go to OCI Console → User Settings
+#       → API Keys → Add API Key → paste it → copy the fingerprint shown
+#
+#   Step 2 — deploy with fingerprint:
+#     OCI_FINGERPRINT="xx:xx:xx:xx:xx:xx:xx:xx:xx:xx:xx:xx:xx:xx:xx:xx" \
+#     bash scripts/setup-oci-keys.sh
 
 set -euo pipefail
 
@@ -29,8 +32,8 @@ VPS_USER="${VPS_USER:-root}"
 ORACLE_HOST="${ORACLE_HOST:-100.67.229.94}"
 ORACLE_USER="${ORACLE_USER:-ubuntu}"
 
-OCI_USER_OCID="${OCI_USER_OCID:-}"
-OCI_TENANCY_OCID="${OCI_TENANCY_OCID:-}"
+OCI_USER_OCID="${OCI_USER_OCID:-ocid1.user.oc1..aaaaaaaaen5tpfgxukg6npplcsk4kuiquvhjvqub2ojbxnwceczgqhn7buzq}"
+OCI_TENANCY_OCID="${OCI_TENANCY_OCID:-ocid1.tenancy.oc1..aaaaaaaa7mkd2g7upfobixslaiz3ldrfpuyqtizuf25sy3pnw6ejaz7nnqda}"
 OCI_FINGERPRINT="${OCI_FINGERPRINT:-}"
 OCI_REGION="${OCI_REGION:-us-ashburn-1}"
 
