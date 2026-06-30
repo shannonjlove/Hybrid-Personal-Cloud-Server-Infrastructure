@@ -1,9 +1,8 @@
-# WebTop — browser-accessible Linux desktop (linuxserver.io)
-# Runs on the VPS (Nexus) alongside existing services.
-# Access at: https://desktop.shannonjlove.cloud
+# DEPRECATED — kept as reference only.
+# Production setup uses Podman Quadlets: see quadlets/webtop/ and scripts/start-webtop.sh
 #
-# Includes Claude Desktop + Node.js for MCP tool support.
-# MCP config is bind-mounted from ./mcp-config.json
+# WebTop — browser-accessible Linux desktop (linuxserver.io)
+# Access at: https://desktop.shannonjlove.cloud
 #
 # Ollama runs as a sibling service on the shared `webtop-net` network.
 # mcp-ollama (uvx) inside WebTop reaches it at http://ollama:11434
