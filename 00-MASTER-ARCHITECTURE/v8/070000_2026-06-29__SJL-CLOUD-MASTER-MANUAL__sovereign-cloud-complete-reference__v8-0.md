@@ -209,6 +209,7 @@ sudo systemctl daemon-reload
 | MCP: Google Drive | sjl-mcp-gdrive | mcp-gdrive.container | 127.0.0.1:7705 | mcp-fleet.network | localhost/sjl/mcp-gdrive:latest | 030000 |
 | MCP: iDrive E2 | sjl-mcp-idrive-e2 | mcp-idrive-e2.container | 127.0.0.1:8025 | mcp-fleet.network | localhost/sjl/mcp-idrive-e2:latest | 030000 |
 | MCP: rclone | sjl-mcp-rclone | mcp-rclone.container | 127.0.0.1:8026 | mcp-fleet.network | localhost/sjl/mcp-rclone:latest | 030000 |
+| MCP: basic-memory | sjl-basic-memory | mcp-basic-memory.container | none (stdio) | — | localhost/sjl-basic-memory:latest | 079000 |
 
 ⚠ = Documented privileged exception. Only NPM (host ports 80/443) and Tailscale (NET_ADMIN + NET_RAW + /dev/net/tun + host networking) are permitted to use elevated privileges. This list is fixed — never generalize.
 
@@ -336,27 +337,31 @@ API auth fields:  {"identity": "...", "secret": "..."}  ← non-standard field n
 
 ### 6.1 What MCP Servers Are
 
-Each MCP (Model Context Protocol) server is a FastMCP-based HTTP server running as a Podman container, accessible only on localhost. Claude Code connects to each via `claude mcp add --transport http`.
+The MCP fleet consists of two types:
 
-All 7 MCP servers are in the `mcp-fleet.network` (internal). Only their host `PublishPort` (127.0.0.1:NNNN) is accessible from Nexus processes — they are never reachable from the public internet or from sOs.
+**Type A — FastMCP HTTP servers (7 servers):** Each runs as a Podman container in `mcp-fleet.network`, exposing a localhost HTTP port. Claude Code connects via `claude mcp add --transport http`. Only their host `PublishPort` (127.0.0.1:NNNN) is accessible from Nexus — never from the public internet or sOs.
+
+**Type B — stdio server (1 server — basic-memory):** Runs as a persistent Podman container (`CMD sleep infinity`). Claude Code connects via `podman exec -i sjl-basic-memory uvx basic-memory mcp --home /memory` (stdio transport). No port required. Memory files are bind-mounted from the PARA agent-context tree at `/srv/sjl/070000_SYSTEM-AUTOMATION/079000_AGENT-CONTEXT/memory/` — making them git-trackable, rclone-mirrored, and FileWarden-governed.
 
 ### 6.2 MCP Server Registry
 
-| MCP Server | Port | Env file | Function |
-|---|---|---|---|
-| pCloud | 7701 | `/opt/secrets/mcp-pcloud.env` | Browse, upload, download pCloud storage |
-| Backblaze B2 | 7702 | `/opt/secrets/mcp-backblaze-b2.env` | S3-compatible B2 bucket operations |
-| MediaFire | 7703 | `/opt/secrets/mcp-mediafire.env` | MediaFire file management |
-| MEGA | 7704 | `/opt/secrets/mcp-mega.env` | MEGA cloud encrypted storage |
-| Google Drive | 7705 | `/opt/secrets/mcp-gdrive.env` | Google Drive file operations |
-| iDrive E2 | 8025 | `/opt/secrets/mcp-idrive-e2.env` | iDrive E2 S3-compatible primary storage |
-| rclone | 8026 | `/opt/secrets/mcp-rclone.env` | Multi-remote rclone operations |
+| MCP Server | Transport | Port | Env file | Function |
+|---|---|---|---|---|
+| pCloud | HTTP | 7701 | `/opt/secrets/mcp-pcloud.env` | Browse, upload, download pCloud storage |
+| Backblaze B2 | HTTP | 7702 | `/opt/secrets/mcp-backblaze-b2.env` | S3-compatible B2 bucket operations |
+| MediaFire | HTTP | 7703 | `/opt/secrets/mcp-mediafire.env` | MediaFire file management |
+| MEGA | HTTP | 7704 | `/opt/secrets/mcp-mega.env` | MEGA cloud encrypted storage |
+| Google Drive | HTTP | 7705 | `/opt/secrets/mcp-gdrive.env` | Google Drive file operations |
+| iDrive E2 | HTTP | 8025 | `/opt/secrets/mcp-idrive-e2.env` | iDrive E2 S3-compatible primary storage |
+| rclone | HTTP | 8026 | `/opt/secrets/mcp-rclone.env` | Multi-remote rclone operations |
+| basic-memory | stdio | none | none | Persistent Claude Code memory (Markdown, PARA tree) |
 
 ### 6.3 MCP Registration Commands
 
 After building images and starting containers, register with Claude Code:
 
 ```bash
+# Type A — HTTP transport (FastMCP fleet)
 claude mcp add --transport http --scope user pcloud         http://localhost:7701/mcp
 claude mcp add --transport http --scope user backblaze-b2   http://localhost:7702/mcp
 claude mcp add --transport http --scope user mediafire       http://localhost:7703/mcp
@@ -364,6 +369,10 @@ claude mcp add --transport http --scope user mega            http://localhost:77
 claude mcp add --transport http --scope user gdrive          http://localhost:7705/mcp
 claude mcp add --transport http --scope user idrive-e2       http://localhost:8025/mcp
 claude mcp add --transport http --scope user rclone          http://localhost:8026/mcp
+
+# Type B — stdio transport (basic-memory)
+claude mcp add --transport stdio --scope user memory \
+  podman exec -i sjl-basic-memory uvx basic-memory mcp --home /memory
 ```
 
 ### 6.4 MCP Image Build (Required — images not on Docker Hub)
@@ -379,6 +388,19 @@ podman build -t localhost/sjl/mcp-mega:latest          ./mcp-mega/
 podman build -t localhost/sjl/mcp-gdrive:latest        ./mcp-gdrive/
 podman build -t localhost/sjl/mcp-idrive-e2:latest     ./mcp-idrive-e2/
 podman build -t localhost/sjl/mcp-rclone:latest        ./mcp-rclone/
+```
+
+**basic-memory image (Type B — separate build):**
+
+```bash
+# From this repo: 02-CONTAINERS/mcp-basic-memory/
+podman build -t localhost/sjl-basic-memory:latest ./02-CONTAINERS/mcp-basic-memory/
+
+# Create PARA memory directory (once)
+mkdir -p /srv/sjl/070000_SYSTEM-AUTOMATION/079000_AGENT-CONTEXT/memory
+
+# Enable service (after stow deploy)
+systemctl --user enable --now sjl-basic-memory.service
 ```
 
 ---

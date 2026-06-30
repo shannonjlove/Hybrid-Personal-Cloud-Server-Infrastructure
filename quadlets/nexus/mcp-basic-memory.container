@@ -1,0 +1,25 @@
+[Unit]
+Description=SJL Basic Memory — persistent Claude Code memory (stdio MCP)
+After=network-online.target
+Wants=network-online.target
+
+[Container]
+ContainerName=sjl-basic-memory
+Image=localhost/sjl-basic-memory:latest
+
+# Bind memory files from PARA agent-context tree (git-trackable, rclone-mirrored)
+Volume=/srv/sjl/070000_SYSTEM-AUTOMATION/079000_AGENT-CONTEXT/memory/:/memory:Z
+
+# No ports — transport is stdio via `podman exec`, not HTTP
+# Register with: claude mcp add --transport stdio --scope user memory \
+#   podman exec -i sjl-basic-memory uvx basic-memory mcp --home /memory
+
+AutoUpdate=registry
+Timezone=America/Los_Angeles
+
+[Service]
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=default.target

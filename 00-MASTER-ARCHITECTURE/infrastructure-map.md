@@ -19,8 +19,8 @@
 | Runtime | rootless Podman + systemd Quadlets |
 | Reverse Proxy | **Nginx Proxy Manager** (sjl-npm) — ports 80/443/81 |
 
-**Services on Nexus (18 containers):**
-NPM · Portainer · Uptime Kuma · BookStack (+ MariaDB) · PaperParrot (+ PostgreSQL + Redis + AI) · n8n · Tailscale · 7× MCP servers
+**Services on Nexus (19 containers):**
+NPM · Portainer · Uptime Kuma · BookStack (+ MariaDB) · PaperParrot (+ PostgreSQL + Redis + AI) · n8n · Tailscale · 7× MCP servers (HTTP) · basic-memory MCP (stdio)
 
 ### sOs — Oracle Cloud ARM64 (Private Compute)
 

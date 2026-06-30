@@ -36,7 +36,7 @@ A self-hosted sovereign cloud spanning two active nodes — Hostinger VPS (Nexus
 | Document Archive | Knowledge + indexing | PaperParrot (Paperless-NGX) + BookStack |
 | File Governance | Metadata, versioning, mirroring | FileWarden v2 pipeline (spec; impl pending) |
 | Cloud Storage | Primary + redundancy | iDrive E2 (primary), B2, pCloud, GDrive |
-| MCP Fleet | Claude Code cloud access | 7 FastMCP servers (localhost-only) |
+| MCP Fleet | Claude Code cloud access + persistent memory | 7 FastMCP HTTP servers + basic-memory (stdio) |
 | Monitoring | Health + alerting | Uptime Kuma + n8n alert routing |
 
 ## NOT Used (Explicitly Removed in v8.0)
