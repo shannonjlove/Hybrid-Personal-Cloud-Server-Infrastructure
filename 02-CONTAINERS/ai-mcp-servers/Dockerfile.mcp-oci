@@ -1,0 +1,29 @@
+FROM python:3.11-slim
+
+WORKDIR /opt/mcp-server-oci
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends git curl && \
+    rm -rf /var/lib/apt/lists/*
+
+# Install MCP Python SDK and OCI dependencies
+RUN pip install --no-cache-dir \
+    "git+https://github.com/modelcontextprotocol/python-sdk.git" \
+    "oci>=2.0.0" \
+    "fastapi>=0.100.0" \
+    "uvicorn>=0.22.0" \
+    "click>=8.1.0" \
+    "pydantic>=2.0.0" \
+    "loguru>=0.7.0"
+
+# Clone and install mcp-server-oci
+RUN git clone https://github.com/jopsis/mcp-server-oci . && \
+    pip install --no-cache-dir -e .
+
+# OCI credentials are mounted at runtime — never baked into the image
+VOLUME /root/.oci
+
+ENV FASTMCP_LOG_LEVEL=INFO
+
+# The container stays alive; Claude Code execs into it for stdio MCP sessions
+CMD ["tail", "-f", "/dev/null"]

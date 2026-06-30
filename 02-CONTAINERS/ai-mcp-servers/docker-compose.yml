@@ -1,0 +1,20 @@
+services:
+
+  # MCP server for Oracle Cloud Infrastructure
+  # Claude Code spawns sessions via: docker exec -i mcp-server-oci python -m mcp_server_oci.mcp_server
+  mcp-server-oci:
+    build:
+      context: .
+      dockerfile: Dockerfile.mcp-oci
+    image: mcp-server-oci:local
+    container_name: mcp-server-oci
+    restart: unless-stopped
+    volumes:
+      # Mount host OCI credentials read-only; never bake secrets into the image
+      - ${OCI_CONFIG_DIR:-~/.oci}:/root/.oci:ro
+    environment:
+      - FASTMCP_LOG_LEVEL=${FASTMCP_LOG_LEVEL:-INFO}
+    # No ports exposed — MCP protocol runs over stdio via docker exec
+    labels:
+      - "com.shannonjlove.service=mcp-server-oci"
+      - "com.shannonjlove.role=mcp"

@@ -1,0 +1,49 @@
+services:
+
+  # Browser-accessible Linux desktop (KDE on Ubuntu)
+  webtop:
+    image: lscr.io/linuxserver/webtop:ubuntu-kde
+    container_name: webtop
+    restart: unless-stopped
+    security_opt:
+      - seccomp:unconfined
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=${TZ:-America/New_York}
+      - SUBFOLDER=/          # set to /webtop/ if behind a path-based proxy
+      - TITLE=Nexus Desktop
+    volumes:
+      - webtop-config:/config
+      # Mount OCI credentials and the mcp-server-oci init script
+      - ${OCI_CONFIG_DIR:-~/.oci}:/config/.oci:ro
+      - ./init-mcp-oci.sh:/config/custom-cont-init.d/10-mcp-oci.sh:ro
+    ports:
+      - "3010:3000"   # HTTP desktop (protect with Traefik auth in production)
+      - "3011:3001"   # HTTPS desktop
+    shm_size: "1gb"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.webtop.rule=Host(`desktop.shannonjlove.cloud`)"
+      - "traefik.http.routers.webtop.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.webtop.middlewares=webtop-auth"
+      - "traefik.http.middlewares.webtop-auth.basicauth.users=${WEBTOP_AUTH_USERS}"
+      - "traefik.http.services.webtop.loadbalancer.server.port=3000"
+
+  # OCI MCP server sidecar — shared between WebTop and other consumers
+  mcp-server-oci:
+    build:
+      context: ../ai-mcp-servers
+      dockerfile: Dockerfile.mcp-oci
+    image: mcp-server-oci:local
+    container_name: mcp-server-oci
+    restart: unless-stopped
+    volumes:
+      - ${OCI_CONFIG_DIR:-~/.oci}:/root/.oci:ro
+    environment:
+      - FASTMCP_LOG_LEVEL=${FASTMCP_LOG_LEVEL:-INFO}
+    labels:
+      - "com.shannonjlove.service=mcp-server-oci"
+
+volumes:
+  webtop-config:

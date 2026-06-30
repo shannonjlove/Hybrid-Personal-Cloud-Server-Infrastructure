@@ -1,0 +1,32 @@
+[Unit]
+Description=MCP Server for Oracle Cloud Infrastructure
+Documentation=https://github.com/jopsis/mcp-server-oci
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=mcp-oci
+Group=mcp-oci
+WorkingDirectory=/opt/mcp-server-oci
+ExecStart=/opt/mcp-server-oci/.venv/bin/python -m mcp_server_oci.mcp_server --profile DEFAULT
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=10
+
+Environment=FASTMCP_LOG_LEVEL=INFO
+Environment=HOME=/opt/mcp-server-oci
+Environment=OCI_CONFIG_FILE=/opt/mcp-server-oci/.oci/config
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=mcp-server-oci
+
+# Harden the service
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/mcp-server-oci
+
+[Install]
+WantedBy=multi-user.target
