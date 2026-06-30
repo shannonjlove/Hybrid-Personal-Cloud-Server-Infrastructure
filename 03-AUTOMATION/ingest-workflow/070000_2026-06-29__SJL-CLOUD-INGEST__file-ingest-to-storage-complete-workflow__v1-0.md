@@ -53,6 +53,64 @@ Available in PaperParrot web UI at https://paperless.shannonjlove.cloud
 
 **Note:** Files consumed directly via PaperParrot skip the FileWarden pipeline. They should still have FileWarden process them via the FileWarden → PaperParrot integration once FileWarden is implemented.
 
+### 0.3 Mac-Side Preprocessing (runs on `shannonjlove` Mac before SFTP upload)
+
+Files arriving from the Mac may carry corrupt dates, stripped EXIF (WhatsApp, social media), or a quarantine xattr. This preprocessing layer runs on the Mac before SFTP — it is NOT a Nexus operation.
+
+**Tools required on Mac:**
+- `exiftool` — `brew install exiftool`
+- `tag` (jdberry/tag) — `brew install tag`
+- `mdls` — built into macOS
+
+#### 0.3a — Strip quarantine xattr (post-download / post-AirDrop)
+```bash
+# After FetchWarden or AirDrop delivery, clear quarantine flag:
+xattr -d com.apple.quarantine /path/to/file
+
+# Bulk clear on a directory:
+xattr -dr com.apple.quarantine /srv/sjl/010000_INBOX/
+```
+**Why:** macOS Gatekeeper adds `com.apple.quarantine` to downloaded files, causing dialogs on open. Clear after integrity verification, never before.
+
+#### 0.3b — ExifTool date recovery (sentinel detection)
+Run before SFTP upload. Fixes corrupt/stripped dates so FileWarden ANALYZE gets correct `captured_at`.
+
+```bash
+# Check for sentinel dates (WhatsApp/social-media-stripped, Unix-epoch-corrupt):
+exiftool -q -if '$DateTimeOriginal =~ /^(1970|1999)/' -filename -DateTimeOriginal /path/
+
+# For images: recover FileModifyDate from DateTimeOriginal (if valid):
+exiftool '-FileModifyDate<DateTimeOriginal' /path/to/file.jpg
+
+# For videos with corrupt creation date (1970-01-01): recover from TrackCreateDate:
+exiftool '-FileModifyDate<TrackCreateDate' '-FileName<TrackCreateDate' \
+  -d %Y-%m-%d_%H.%M.%S.%%e /path/to/video.mov
+
+# Batch: recover all images in a folder from DateTimeOriginal:
+exiftool -r '-FileModifyDate<DateTimeOriginal' /srv/sjl/010000_INBOX/
+```
+
+#### 0.3c — Pre-tag with PARA codes (Finder tags)
+Apply PARA Finder tags on Mac using `mdls` + `xattr` (read-modify-write). This survives SFTP if metadata is preserved; FileWarden also re-applies on Nexus in Stage 8.
+
+```bash
+# Read existing tags (safe — uses mdls, not xattr hex dump):
+mdls -raw -name kMDItemUserTags /path/to/file
+
+# Write PARA Finder tag (plist XML format — overwrites all tags):
+xattr -w com.apple.metadata:_kMDItemUserTags \
+  '<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><array><string>sjl-para-070000</string></array></plist>' \
+  /path/to/file
+
+# Add tag WITHOUT destroying existing tags (read-modify-write via `tag` CLI):
+tag --add sjl-para-070000 /path/to/file
+
+# Preferred one-liner using jdberry/tag:
+tag --add "sjl-para-${PARA_CODE}" /path/to/file
+```
+
+**Note on xattr transport:** Standard `scp`/`sftp` do NOT preserve macOS xattrs. Tags and quarantine flags are stripped in transit. The Mac-side preprocessing (especially ExifTool date recovery into FileModifyDate) is what survives the SFTP transfer. xattr data on Nexus is re-written by FileWarden Stage 8 using Linux `user.*` namespace.
+
 ---
 
 ## STAGE 1 — DISCOVER
@@ -220,6 +278,100 @@ Return to FileWarden
 - NSFW > 0.7 → 060000_PRIVATE-MEDIA, ServicePrimary=stash
 - Classification confidence < threshold → 090000_QUARANTINE
 
+### 4d. extract_captured_at(path, mime_type) → captured_at dict
+**Program:** FileWarden daemon via `exiftool` subprocess
+**Why this exists:** Cloud services, messaging apps (WhatsApp), and iOS photo editors strip or corrupt EXIF dates. FileWarden must derive the best available `captured_at` from a priority chain rather than trusting filesystem timestamps.
+
+**Date sentinel table** (dates that indicate corruption/stripping — reject as `captured_at`):
+
+| Sentinel date | Cause |
+|---|---|
+| `1970-01-01` | Unix epoch — video container corruption (Everpix, Loom) |
+| `1999-11-30` | WhatsApp EXIF strip default |
+| `2001-01-01` | iOS creation timestamp reset |
+| Any pre-`1990-01-01` in modern media | Indicates corruption unless archival scan |
+
+**Priority chain by MIME type:**
+
+| Priority | Image (image/*) | Video (video/*) |
+|---|---|---|
+| 1 (best) | `EXIF:DateTimeOriginal` | `QuickTime:DateTimeOriginal` |
+| 2 | `EXIF:CreateDate` | `QuickTime:CreateDate` |
+| 3 | `XMP:DateCreated` | `QuickTime:TrackCreateDate` ← survives many corruptions |
+| 4 | `IPTC:DateCreated` | `QuickTime:TrackModifyDate` |
+| 5 | `GPS:GPSDateTime` | `XMP:DateCreated` |
+| 6 (last resort) | `File:FileModifyDate` | `File:FileModifyDate` |
+| — (reject) | Sentinel date → `captured_at = null`, `exif_stripped = true` | Same |
+
+```python
+EXIF_DATE_PRIORITY_IMAGE = [
+    'EXIF:DateTimeOriginal',
+    'EXIF:CreateDate',
+    'XMP:DateCreated',
+    'IPTC:DateCreated',
+    'Composite:GPSDateTime',
+    'File:FileModifyDate',  # last resort only
+]
+
+EXIF_DATE_PRIORITY_VIDEO = [
+    'QuickTime:DateTimeOriginal',
+    'QuickTime:CreateDate',
+    'QuickTime:TrackCreateDate',   # often survives when container is corrupt
+    'QuickTime:TrackModifyDate',
+    'XMP:DateCreated',
+    'File:FileModifyDate',
+]
+
+DATE_SENTINELS = ['1970-01-01', '1999-11-30', '2001-01-01']
+
+def extract_captured_at(path: str, mime_type: str) -> dict:
+    result = subprocess.run(
+        ['exiftool', '-json', '-a', '-G', '-d', '%Y-%m-%dT%H:%M:%S%z', path],
+        capture_output=True, text=True, timeout=30
+    )
+    if result.returncode != 0:
+        return {'captured_at': None, 'captured_at_source': None, 'exif_stripped': True}
+    
+    tags = json.loads(result.stdout)[0] if result.stdout.strip() else {}
+    
+    priority = EXIF_DATE_PRIORITY_IMAGE if mime_type.startswith('image/') else EXIF_DATE_PRIORITY_VIDEO
+    
+    for key in priority:
+        val = tags.get(key)
+        if not val:
+            continue
+        if any(sentinel in val for sentinel in DATE_SENTINELS):
+            continue  # reject sentinel date
+        return {
+            'captured_at': val,
+            'captured_at_source': key,
+            'exif_stripped': False,
+        }
+    
+    # No valid date found — route to quarantine for manual date entry
+    return {'captured_at': None, 'captured_at_source': None, 'exif_stripped': True}
+```
+
+**On `exif_stripped = True`:**
+- Source is likely WhatsApp, Twitter/X, iMessage photo edit, or corrupted archive app
+- Record `exif_stripped: true` in sidecar JSON
+- Route to `090000_QUARANTINE/` with reason `exif_stripped` for manual `captured_at` assignment
+- Preserve the `kMDItemWhereFroms` xattr if present (contains origin URL/service name)
+
+**ExifTool batch repair command (operator tool — not automated):**
+```bash
+# Recover all images in a directory from DateTimeOriginal:
+exiftool -r '-FileModifyDate<DateTimeOriginal' /srv/sjl/010000_INBOX/
+
+# Recover videos from TrackCreateDate when container date is 1970:
+exiftool -r -if '$CreateDate =~ /^1970/' \
+  '-CreateDate<TrackCreateDate' '-ModifyDate<TrackCreateDate' \
+  /srv/sjl/010000_INBOX/
+
+# View all date tags for a single file (diagnosis):
+exiftool -a -G -time:all /path/to/file
+```
+
 ---
 
 ## STAGE 5 — VERSION
@@ -333,6 +485,9 @@ record = {
     'nsfw_score': vision_result.get('nsfw_score', 0.0),
     'origin_device': metadata.get('origin_device', 'unknown'),
     'intake_method': metadata.get('intake_method', 'unknown'),
+    'captured_at': metadata.get('captured_at'),           # best date from EXIF chain
+    'captured_at_source': metadata.get('captured_at_source'),  # which EXIF tag won
+    'exif_stripped': metadata.get('exif_stripped', False), # True = WhatsApp/social stripped
     'governed_at': datetime.now(timezone.utc).isoformat(),
     'mirror_manifest_path': str(sidecar_dir / 'mirror-manifest.json'),
 }
@@ -360,6 +515,69 @@ exiftool \
   -XMP-sjl:Version="${VERSION}" \
   -XMP-sjl:Sha256="${SHA256}" \
   "${CANONICAL_PATH}"
+```
+
+### 8d. Enrich standard metadata xattrs (Linux — non-fatal)
+**Program:** FileWarden daemon via `xattr` lib + `exiftool` subprocess
+**Platform:** Nexus (Linux — `user.*` namespace, NOT `com.apple.*`)
+**Non-fatal:** Failures here are logged but do not abort the transaction.
+
+These xattrs make file provenance readable by any `xattr`-aware tool on the Linux side:
+
+```python
+# Standard Linux xattrs for provenance (user.* namespace on Linux):
+xattr.setxattr(canonical_path, 'user.sjl.docid',    docid.encode())
+xattr.setxattr(canonical_path, 'user.sjl.para',     para_code.encode())
+xattr.setxattr(canonical_path, 'user.sjl.version',  version_string.encode())
+xattr.setxattr(canonical_path, 'user.sjl.sha256',   sha256_hex.encode())
+xattr.setxattr(canonical_path, 'user.sjl.captured_at', captured_at.encode() if captured_at else b'unknown')
+xattr.setxattr(canonical_path, 'user.sjl.exif_stripped', b'true' if exif_stripped else b'false')
+
+# If provenance URL known (FetchWarden, download source):
+if origin_url:
+    xattr.setxattr(canonical_path, 'user.sjl.origin_url', origin_url.encode())
+```
+
+**macOS xattr enrichment (cross-reference — NOT run on Nexus):**
+When a file is served back to Mac (via SFTP, Finder mount, or direct copy), the Mac-side post-receive script applies:
+
+```bash
+# On Mac, after receiving file from Nexus:
+
+# Write DOCID to kMDItemDescription (appears in Finder "Get Info"):
+xattr -w com.apple.metadata:kMDItemDescription \
+  "${DOCID} | ${PARA_CODE} | ${VERSION}" \
+  /path/to/file
+
+# Write PARA code as Finder tag (using jdberry/tag for safe read-modify-write):
+tag --add "sjl-para-${PARA_CODE}" /path/to/file
+
+# Preserve WhereFroms if origin URL available (Spotlight-searchable):
+python3 -c "
+import plistlib, subprocess
+plist = plistlib.dumps(['${ORIGIN_URL}', '${FETCH_REFERRER}'], fmt=plistlib.FMT_XML)
+subprocess.run(['xattr', '-w', 'com.apple.metadata:kMDItemWhereFroms', plist.decode(), '/path/to/file'])
+"
+```
+
+**Key macOS xattr reference** (from Eclectic Light Company — read with `mdls` or `xattr -l`):
+
+| xattr key | Purpose | FileWarden use |
+|---|---|---|
+| `com.apple.metadata:_kMDItemUserTags` | Finder tags (plist array) | PARA code tags |
+| `com.apple.metadata:kMDItemDescription` | Arbitrary text (Finder Get Info) | DOCID + PARA + version |
+| `com.apple.metadata:kMDItemWhereFroms` | Download origin URLs (plist array) | FetchWarden provenance |
+| `com.apple.metadata:kMDItemDownloadedDate` | Download timestamp | FetchWarden acquisition date |
+| `com.apple.metadata:kMDItemCreator` | App that created file | FileWarden tag |
+| `com.apple.quarantine` | Gatekeeper quarantine flag | Clear after verification (Stage 0.3a) |
+
+**Reading tags safely on Mac (use mdls, not xattr hex):**
+```bash
+# CORRECT — readable output:
+mdls -raw -name kMDItemUserTags /path/to/file
+
+# AVOID — binary plist hex dump:
+xattr -px com.apple.metadata:_kMDItemUserTags /path/to/file
 ```
 
 **On any write failure in 8a, 8b, or 8c:** Transaction aborts. File is moved back to pre-rename location. Error written to audit log. Operator alert via n8n.
@@ -568,6 +786,9 @@ def archive_paperparrot(docid: str, canonical_path: str) -> str:
 
 | Stage | Program/Service | On Nexus or sOs | Notes |
 |---|---|---|---|
+| Pre-intake: quarantine clear | `xattr -d com.apple.quarantine` | **Mac** | After download verification |
+| Pre-intake: date recovery | `exiftool -r '-FileModifyDate<DateTimeOriginal'` | **Mac** | Before SFTP upload |
+| Pre-intake: PARA tag | `tag --add sjl-para-NNNNNN` (jdberry/tag) | **Mac** | Finder tag; stripped in SFTP |
 | Intake (SFTP) | OpenSSH sshd | Nexus | User connects to sjl@100.115.66.75 |
 | Intake (n8n) | sjl-n8n container | Nexus | Podman Quadlet |
 | Intake (PaperParrot) | sjl-paperparrot container | Nexus | Direct consume dir |
@@ -576,14 +797,16 @@ def archive_paperparrot(docid: str, canonical_path: str) -> str:
 | IDENTIFY / hash | FileWarden daemon | Nexus | hashlib.sha256 |
 | IDENTIFY / docid | FileWarden + Mirror Registry | Nexus | PostgreSQL sequence |
 | ANALYZE / metadata | FileWarden + exiftool | Nexus | Subprocess |
+| ANALYZE / date chain | FileWarden + exiftool (priority chain) | Nexus | Sentinel detection; EXIF date fallback |
 | ANALYZE / OCR | sjl-ocr-vision-worker | **sOs ARM64** | Queue via n8n + Tailscale |
 | ANALYZE / vision | sjl-ocr-vision-worker | **sOs ARM64** | Same worker |
 | VERSION | FileWarden + Mirror Registry | Nexus | PostgreSQL lookup |
 | DIFF | DiffForge (FastAPI :8087) | Nexus | Non-fatal |
 | RENAME | FileWarden daemon | Nexus | os.rename() |
-| SIDECAR / JSON | FileWarden daemon | Nexus | json.dumps + write |
-| SIDECAR / xattr | FileWarden + xattr lib | Nexus | setxattr() |
+| SIDECAR / JSON | FileWarden daemon | Nexus | json.dumps + write; includes captured_at + exif_stripped |
+| SIDECAR / xattr (Linux) | FileWarden + xattr lib | Nexus | user.sjl.* namespace |
 | SIDECAR / XMP | FileWarden + exiftool | Nexus | Subprocess |
+| SIDECAR / xattr (macOS) | xattr + mdls + jdberry/tag | **Mac** (post-receive) | com.apple.* namespace; kMDItemDescription=DOCID |
 | HOOK | HookVault CLI (sjl-hook) | Nexus | FastAPI :8086 |
 | MIRROR | rclone | Nexus | S3 PUT to iDrive E2 |
 | MIRROR verify | rclone hashsum | Nexus | SHA-256 comparison |
