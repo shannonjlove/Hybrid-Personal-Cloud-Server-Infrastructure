@@ -1,0 +1,40 @@
+# =============================================================================
+# WebTop – Browser-accessible Ubuntu KDE Desktop
+# Oracle VPS (sOs) | desktop.shannonjlove.cloud
+# =============================================================================
+
+version: "3.9"
+
+services:
+  webtop:
+    image: lscr.io/linuxserver/webtop:ubuntu-kde
+    container_name: webtop
+    security_opt:
+      - seccomp:unconfined
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=${TZ:-America/Los_Angeles}
+      - SUBFOLDER=/
+      - TITLE=SJL Desktop
+    volumes:
+      - webtop-config:/config
+      - /home/ubuntu/webtop-home:/config/Desktop
+      - ./custom-cont-init.d:/custom-cont-init.d:ro
+      - /etc/localtime:/etc/localtime:ro
+    ports:
+      - "3000:3000"
+      - "3001:3001"
+    shm_size: "1gb"
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.webtop.rule=Host(`desktop.shannonjlove.cloud`)"
+      - "traefik.http.routers.webtop.entrypoints=websecure"
+      - "traefik.http.routers.webtop.tls.certresolver=letsencrypt"
+      - "traefik.http.services.webtop.loadbalancer.server.port=3000"
+      - "traefik.http.routers.webtop.middlewares=webtop-auth"
+      - "traefik.http.middlewares.webtop-auth.basicauth.users=${WEBTOP_AUTH_USERS}"
+
+volumes:
+  webtop-config:
