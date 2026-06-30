@@ -16,12 +16,13 @@ Shannon J Love — sjlove@shannonjeffreylove.com
 - VPN: Tailscale primary (`ssh ubuntu@sOs`), WireGuard fallback
 - PARA methodology applied across all systems and file organization
 
-## BookStack API — docs.shannonjlove.cloud
+## BookStack API — bookstack.shannonjlove.cloud
 - Token ID:     `iDqzYIXrsrH0QQzF6IOxQ5TUeMasoY0G`
 - Token Secret: `6cjN6bKnAhJTVjlneZgfUyGjUzst26wC`
 - Auth header:  `Authorization: Token iDqzYIXrsrH0QQzF6IOxQ5TUeMasoY0G:6cjN6bKnAhJTVjlneZgfUyGjUzst26wC`
-- Base URL:     `https://docs.shannonjlove.cloud/api`
+- Base URL:     `https://bookstack.shannonjlove.cloud/api`
 - Added:        June 2026
+- Note:         `docs.shannonjlove.cloud` routes to Paperless-ngx (separate service)
 
 ## Installed Automation Tools
 | Tool | Path | Purpose |
@@ -48,7 +49,7 @@ Shannon J Love — sjlove@shannonjeffreylove.com
 ## File Naming Convention
 `YYYY-MM-DD_HH-MM_category-subcategory_description_UUID24.ext`
 
-## BookStack Structure (docs.shannonjlove.cloud)
+## BookStack Structure (bookstack.shannonjlove.cloud)
 ```
 Shelf: 03 - Automation
   Book: Automation Tools
