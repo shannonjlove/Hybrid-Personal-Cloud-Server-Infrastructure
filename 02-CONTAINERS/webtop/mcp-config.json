@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "memlord": {
+      "url": "https://memory.shannonjlove.cloud/mcp"
+    },
+    "memstate": {
+      "command": "npx",
+      "args": ["-y", "@memstate/mcp"],
+      "env": {
+        "MEMSTATE_API_KEY": "YOUR_MEMSTATE_API_KEY_HERE"
+      }
+    }
+  }
+}

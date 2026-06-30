@@ -1,0 +1,15 @@
+{
+  "_comment": "MCP config for Claude Code / Claude Desktop on all server targets. Copy to ~/.claude/claude_desktop_config.json and fill in YOUR_MEMSTATE_API_KEY_HERE.",
+  "mcpServers": {
+    "memlord": {
+      "url": "https://memory.shannonjlove.cloud/mcp"
+    },
+    "memstate": {
+      "command": "npx",
+      "args": ["-y", "@memstate/mcp"],
+      "env": {
+        "MEMSTATE_API_KEY": "YOUR_MEMSTATE_API_KEY_HERE"
+      }
+    }
+  }
+}

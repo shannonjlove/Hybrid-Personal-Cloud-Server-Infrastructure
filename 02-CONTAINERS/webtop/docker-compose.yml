@@ -1,0 +1,34 @@
+# WebTop — browser-accessible Linux desktop (linuxserver.io)
+# Runs on the VPS (Nexus) alongside existing services.
+# Access at: https://desktop.shannonjlove.cloud
+#
+# Includes Claude Desktop + Node.js for MCP tool support.
+# MCP config is bind-mounted from ./mcp-config.json
+
+services:
+
+  webtop:
+    image: lscr.io/linuxserver/webtop:ubuntu-kde
+    container_name: webtop
+    restart: unless-stopped
+    security_opt:
+      - seccomp:unconfined
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=${TZ:-America/Chicago}
+      - TITLE=Shannon Cloud Desktop
+    volumes:
+      - webtop-data:/config
+      - ./mcp-config.json:/config/.config/Claude/claude_desktop_config.json:ro
+    shm_size: "1gb"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.webtop.rule=Host(`desktop.shannonjlove.cloud`)"
+      - "traefik.http.routers.webtop.tls.certresolver=letsencrypt"
+      - "traefik.http.services.webtop.loadbalancer.server.port=3000"
+      - "traefik.http.routers.webtop.middlewares=webtop-auth"
+      - "traefik.http.middlewares.webtop-auth.basicauth.users=${WEBTOP_BASIC_AUTH}"
+
+volumes:
+  webtop-data:
