@@ -1,132 +1,71 @@
 #!/usr/bin/env bash
-# Set up OCI API credentials and deploy to all servers.
+# Deploy existing OCI credentials from Nexus VPS to Oracle sOs and WebTop.
+# Run this script ON the Nexus VPS as root — the credentials already live at
+# /root/.oci/ and this script copies them to the other hosts.
 #
-# BEFORE RUNNING:
-#   1. Log into https://cloud.oracle.com
-#   2. Top-right avatar → User Settings → copy your User OCID
-#   3. Top-right avatar → Tenancy → copy your Tenancy OCID
-#   4. Run this script — it prints a public key
-#   5. In OCI console: User Settings → API Keys → Add API Key → paste the key
-#   6. Copy the fingerprint shown after upload and set OCI_FINGERPRINT below
-#   7. Re-run with all vars set to deploy
-#
-# Usage:
-#   Step 1 — generate keys (no vars needed, user/tenancy pre-filled):
-#     bash scripts/setup-oci-keys.sh
-#     → copy the printed public key, go to OCI Console → User Settings
-#       → API Keys → Add API Key → paste it → copy the fingerprint shown
-#
-#   Step 2 — deploy with fingerprint:
-#     OCI_FINGERPRINT="xx:xx:xx:xx:xx:xx:xx:xx:xx:xx:xx:xx:xx:xx:xx:xx" \
-#     bash scripts/setup-oci-keys.sh
-
+# Usage (from repo root on Nexus VPS):
+#   bash scripts/setup-oci-keys.sh
 set -euo pipefail
 
-KEY_DIR="${HOME}/.oci"
-KEY_FILE="${KEY_DIR}/oci_api_key.pem"
-PUB_FILE="${KEY_DIR}/oci_api_key_public.pem"
-CONFIG_FILE="${KEY_DIR}/config"
+OCI_DIR="/root/.oci"
+KEY_FILE="${OCI_DIR}/oci_api_key.pem"
+CONFIG_FILE="${OCI_DIR}/config"
 
-VPS_HOST="${VPS_HOST:-72.61.74.250}"
-VPS_USER="${VPS_USER:-root}"
-ORACLE_HOST="${ORACLE_HOST:-100.67.229.94}"
+ORACLE_HOST="${ORACLE_HOST:-100.67.229.94}"   # Tailscale
 ORACLE_USER="${ORACLE_USER:-ubuntu}"
+WEBTOP_CONTAINER="${WEBTOP_CONTAINER:-webtop}"
 
-OCI_USER_OCID="${OCI_USER_OCID:-ocid1.user.oc1..aaaaaaaaen5tpfgxukg6npplcsk4kuiquvhjvqub2ojbxnwceczgqhn7buzq}"
-OCI_TENANCY_OCID="${OCI_TENANCY_OCID:-ocid1.tenancy.oc1..aaaaaaaa7mkd2g7upfobixslaiz3ldrfpuyqtizuf25sy3pnw6ejaz7nnqda}"
-OCI_FINGERPRINT="${OCI_FINGERPRINT:-}"
-OCI_REGION="${OCI_REGION:-us-ashburn-1}"
-
-# ── Step 1: Generate key pair ─────────────────────────────────────────────────
-mkdir -p "$KEY_DIR"
-chmod 700 "$KEY_DIR"
-
-if [ ! -f "$KEY_FILE" ]; then
-  echo "Generating OCI API key pair (RSA 4096)..."
-  openssl genrsa -out "$KEY_FILE" 4096
-  openssl rsa -pubout -in "$KEY_FILE" -out "$PUB_FILE"
-  chmod 600 "$KEY_FILE"
-  echo "Keys written to $KEY_DIR"
-else
-  echo "Key already exists at $KEY_FILE — reusing."
+# ── Sanity check ──────────────────────────────────────────────────────────────
+if [ ! -f "$KEY_FILE" ] || [ ! -f "$CONFIG_FILE" ]; then
+  echo "✗ OCI config not found at $OCI_DIR — run this from the Nexus VPS as root."
+  exit 1
 fi
 
-echo ""
-echo "╔══════════════════════════════════════════════════════════════════╗"
-echo "║  PASTE THIS PUBLIC KEY INTO THE OCI CONSOLE (API Keys section)  ║"
-echo "╚══════════════════════════════════════════════════════════════════╝"
-echo ""
-cat "$PUB_FILE"
+echo "Using existing OCI config:"
+grep -v key_file "$CONFIG_FILE"
+echo "key_file=$KEY_FILE"
 echo ""
 
-# ── Step 2: Check if we have all vars to build the config ─────────────────────
-if [ -z "$OCI_USER_OCID" ] || [ -z "$OCI_TENANCY_OCID" ] || [ -z "$OCI_FINGERPRINT" ]; then
-  echo "═══════════════════════════════════════════════════════════════════"
-  echo "  NEXT STEPS:"
-  echo ""
-  echo "  1. Go to: https://cloud.oracle.com → top-right avatar"
-  echo "     → User Settings → API Keys → Add API Key"
-  echo "     → Paste Public Key → paste the key above → Add"
-  echo ""
-  echo "  2. Copy the Fingerprint shown after the key is added."
-  echo ""
-  echo "  3. Get your User OCID:"
-  echo "     Profile → User Settings → copy OCID (starts with ocid1.user...)"
-  echo ""
-  echo "  4. Get your Tenancy OCID:"
-  echo "     Profile → Tenancy → copy OCID (starts with ocid1.tenancy...)"
-  echo ""
-  echo "  5. Re-run with all variables set:"
-  echo "     OCI_USER_OCID='ocid1.user.oc1...' \\"
-  echo "     OCI_TENANCY_OCID='ocid1.tenancy.oc1...' \\"
-  echo "     OCI_FINGERPRINT='xx:xx:xx:...' \\"
-  echo "     OCI_REGION='us-ashburn-1' \\"
-  echo "     bash scripts/setup-oci-keys.sh"
-  echo "═══════════════════════════════════════════════════════════════════"
-  exit 0
-fi
-
-# ── Step 3: Write ~/.oci/config locally ───────────────────────────────────────
-cat > "$CONFIG_FILE" <<EOF
-[DEFAULT]
-user=${OCI_USER_OCID}
-fingerprint=${OCI_FINGERPRINT}
-tenancy=${OCI_TENANCY_OCID}
-region=${OCI_REGION}
-key_file=${KEY_FILE}
-EOF
-chmod 600 "$CONFIG_FILE"
-echo "✓ Local OCI config written to $CONFIG_FILE"
-
-# ── Step 4: Deploy to VPS ─────────────────────────────────────────────────────
-echo ""
-echo "→ Deploying to VPS ($VPS_USER@$VPS_HOST)..."
-ssh "$VPS_USER@$VPS_HOST" "mkdir -p ~/.oci && chmod 700 ~/.oci"
-scp "$KEY_FILE"    "$VPS_USER@$VPS_HOST:~/.oci/oci_api_key.pem"
-scp "$PUB_FILE"    "$VPS_USER@$VPS_HOST:~/.oci/oci_api_key_public.pem"
-scp "$CONFIG_FILE" "$VPS_USER@$VPS_HOST:~/.oci/config"
-ssh "$VPS_USER@$VPS_HOST" "chmod 600 ~/.oci/oci_api_key.pem ~/.oci/config"
-echo "  ✓ VPS done"
-
-# ── Step 5: Deploy to Oracle ──────────────────────────────────────────────────
-echo ""
+# ── Oracle sOs ────────────────────────────────────────────────────────────────
 echo "→ Deploying to Oracle ($ORACLE_USER@$ORACLE_HOST)..."
 ssh "$ORACLE_USER@$ORACLE_HOST" "mkdir -p ~/.oci && chmod 700 ~/.oci"
-scp "$KEY_FILE"    "$ORACLE_USER@$ORACLE_HOST:~/.oci/oci_api_key.pem"
-scp "$PUB_FILE"    "$ORACLE_USER@$ORACLE_HOST:~/.oci/oci_api_key_public.pem"
-# Update key_file path for the oracle user's home dir
-sed "s|${KEY_FILE}|~/.oci/oci_api_key.pem|" "$CONFIG_FILE" | \
-  ssh "$ORACLE_USER@$ORACLE_HOST" "cat > ~/.oci/config && chmod 600 ~/.oci/config"
+scp "$KEY_FILE"  "$ORACLE_USER@$ORACLE_HOST:~/.oci/oci_api_key.pem"
+
+# Write config with corrected key_file path for ubuntu's home
+ssh "$ORACLE_USER@$ORACLE_HOST" "cat > ~/.oci/config" <<EOF
+[DEFAULT]
+user=ocid1.user.oc1..aaaaaaaaen5tpfgxukg6npplcsk4kuiquvhjvqub2ojbxnwceczgqhn7buzq
+fingerprint=gvEnNdwSx/0PYzo9MnbCM+bRiC46U8cQyCVlChGflvY
+tenancy=ocid1.tenancy.oc1..aaaaaaaa7mkd2g7upfobixslaiz3ldrfpuyqtizuf25sy3pnw6ejaz7nnqda
+region=us-ashburn-1
+key_file=/home/ubuntu/.oci/oci_api_key.pem
+EOF
+ssh "$ORACLE_USER@$ORACLE_HOST" "chmod 600 ~/.oci/oci_api_key.pem ~/.oci/config"
 echo "  ✓ Oracle done"
 
-# ── Step 6: Note for WebTop ───────────────────────────────────────────────────
+# ── WebTop container ──────────────────────────────────────────────────────────
 echo ""
-echo "→ WebTop: copy credentials into the running container:"
-echo "   podman cp ~/.oci/oci_api_key.pem webtop:/config/.oci/oci_api_key.pem"
-echo "   podman cp ~/.oci/config           webtop:/config/.oci/config"
-echo "   podman exec webtop chmod 600 /config/.oci/oci_api_key.pem /config/.oci/config"
-echo "   # Update key_file path in the container's config:"
-echo "   podman exec webtop sed -i 's|key_file=.*|key_file=/config/.oci/oci_api_key.pem|' /config/.oci/config"
+echo "→ Deploying to WebTop (podman container: $WEBTOP_CONTAINER)..."
+podman exec "$WEBTOP_CONTAINER" mkdir -p /config/.oci
+podman cp "$KEY_FILE"   "$WEBTOP_CONTAINER:/config/.oci/oci_api_key.pem"
+
+podman exec "$WEBTOP_CONTAINER" bash -c "cat > /config/.oci/config" <<EOF
+[DEFAULT]
+user=ocid1.user.oc1..aaaaaaaaen5tpfgxukg6npplcsk4kuiquvhjvqub2ojbxnwceczgqhn7buzq
+fingerprint=gvEnNdwSx/0PYzo9MnbCM+bRiC46U8cQyCVlChGflvY
+tenancy=ocid1.tenancy.oc1..aaaaaaaa7mkd2g7upfobixslaiz3ldrfpuyqtizuf25sy3pnw6ejaz7nnqda
+region=us-ashburn-1
+key_file=/config/.oci/oci_api_key.pem
+EOF
+podman exec "$WEBTOP_CONTAINER" chmod 600 /config/.oci/oci_api_key.pem /config/.oci/config
+echo "  ✓ WebTop done"
+
+# ── Verify ────────────────────────────────────────────────────────────────────
+echo ""
+echo "→ Verifying Oracle connection..."
+ssh "$ORACLE_USER@$ORACLE_HOST" \
+  "oci iam region list --output table 2>/dev/null | head -5 || echo '  oci CLI not installed — install with: pip install oci-cli'"
 
 echo ""
-echo "✓ All done. Verify with: oci iam user get --user-id $OCI_USER_OCID"
+echo "✓ OCI credentials deployed to Oracle and WebTop."
+echo "  mcp-server-oci will use them automatically on next Claude session."
