@@ -9,7 +9,8 @@
 ## Reverse proxy
 - ALWAYS use **Nginx Proxy Manager** for reverse proxy and SSL
 - NEVER reference Traefik — this stack does not use Traefik
-- NPM web UI: http://shannonjlove.tail179603.ts.net:81 (via Tailscale)
+- NPM web UI (Tailscale): http://shannonjlove.tail179603.ts.net:81
+- NPM web UI (public):    https://npm.shannonjlove.cloud
 - NPM login email: shannonjlove@mac.com
 - NPM password lives in .env on each server (gitignored) — never hardcoded
 - Proxy hosts are configured via API script: scripts/configure-npm-memory.sh

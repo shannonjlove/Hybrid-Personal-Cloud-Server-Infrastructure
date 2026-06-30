@@ -140,11 +140,15 @@ EOF
 if [[ "${ARCH}" != "aarch64" && "${ARCH}" != "arm64" ]]; then
   echo "==> Configuring Nginx Proxy Manager..."
   if bash "${REPO_ROOT}/scripts/configure-npm-memory.sh"; then
-    echo "    NPM proxy host configured."
+    echo "    NPM memory proxy host configured."
   else
-    echo "    WARNING: NPM configuration failed or skipped."
-    echo "    Run manually: bash scripts/configure-npm-memory.sh"
-    echo "    (Set NPM_EMAIL and NPM_PASSWORD in .env or environment first.)"
+    echo "    WARNING: NPM memory config failed. Run: bash scripts/configure-npm-memory.sh"
+  fi
+
+  if bash "${REPO_ROOT}/scripts/configure-npm-public.sh"; then
+    echo "    NPM public UI configured."
+  else
+    echo "    WARNING: NPM public UI config failed. Run: bash scripts/configure-npm-public.sh"
   fi
 fi
 
