@@ -720,21 +720,49 @@ PY
     TMP_STAGE="$(mktemp -d /var/tmp/sjl-mcp-stage.XXXXXX)"
     cp -a "$candidate" "$TMP_STAGE/server.py"
 
-    # Preserve the active working directory and runtime environment.
-    # Override common port/host variables only for the staging process.
-    # PYTHONPATH includes WORKDIR so local sibling modules (e.g. gcp_tools)
-    # are importable even though server.py runs from a temp directory.
+    # Inherit the full production environment from the live 8797 process
+    # (tokens, API keys, all runtime vars set by systemd), then override only
+    # port/host vars for staging isolation. PYTHONPATH includes WORKDIR so
+    # local sibling modules (e.g. gcp_tools) are importable from the temp dir.
     (
-        cd "$WORKDIR"
-        env \
-            PYTHONPATH="${WORKDIR}:${PYTHONPATH:-}" \
-            PORT="$STAGE_PORT" \
-            MCP_PORT="$STAGE_PORT" \
-            SJL_MCP_PORT="$STAGE_PORT" \
-            HOST="127.0.0.1" \
-            MCP_HOST="127.0.0.1" \
-            SJL_MCP_HOST="127.0.0.1" \
-            "$PYTHON_BIN" "$TMP_STAGE/server.py"
+        python3 - \
+                "$PID_8797" \
+                "$STAGE_PORT" \
+                "$WORKDIR" \
+                "$PYTHON_BIN" \
+                "$TMP_STAGE/server.py" <<'PYENV'
+import sys, os
+
+pid  = sys.argv[1]
+port = sys.argv[2]
+wdir = sys.argv[3]
+py   = sys.argv[4]
+srv  = sys.argv[5]
+
+env = {}
+try:
+    with open(f'/proc/{pid}/environ', 'rb') as fh:
+        for item in fh.read().split(b'\0'):
+            if b'=' in item:
+                k, _, v = item.partition(b'=')
+                try:
+                    env[k.decode('utf-8', 'replace')] = v.decode('utf-8', 'replace')
+                except Exception:
+                    pass
+except OSError as exc:
+    print(f'WARNING: could not read production environ: {exc}', file=sys.stderr)
+
+for k in ('PORT', 'MCP_PORT', 'SJL_MCP_PORT'):
+    env[k] = port
+for k in ('HOST', 'MCP_HOST', 'SJL_MCP_HOST'):
+    env[k] = '127.0.0.1'
+
+existing = env.get('PYTHONPATH', '')
+env['PYTHONPATH'] = f'{wdir}:{existing}' if existing else wdir
+
+os.chdir(wdir)
+os.execve(py, [py, srv], env)
+PYENV
     ) > "$BACKUP_ROOT/stage-${candidate_sha}.log" 2>&1 &
     STAGE_PID=$!
 

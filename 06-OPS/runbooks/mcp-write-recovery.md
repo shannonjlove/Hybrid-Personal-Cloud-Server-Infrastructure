@@ -56,7 +56,7 @@ bash -n /path/to/guarded-repair-v1.7.sh && echo "Syntax OK"
 
 # 8. Verify script SHA-256 matches expected value
 sha256sum /path/to/guarded-repair-v1.7.sh
-# Expected: d58669ce5c51b6e3ee86092a3ede8927facf69c810686c4d8c90508eda09186a
+# Expected: a8b404c013d8fc8ed2147622d7ff6ed2f413281ea83012b94948c897474c6509
 ```
 
 **Abort if:**
