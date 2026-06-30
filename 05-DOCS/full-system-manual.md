@@ -32,7 +32,7 @@ Comprehensive operational reference for the Hybrid Personal Cloud Server Infrast
 
 ## Container Management
 
-All containers managed via Docker Compose on Nexus VPS with Traefik reverse proxy.
+All containers managed via Docker Compose on Nexus VPS with Nginx Proxy Manager as the reverse proxy.
 
 > See: `02-CONTAINERS/` for individual service configurations.
 

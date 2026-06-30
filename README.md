@@ -6,7 +6,7 @@ This repo is the operational blueprint for Shannon J. Love’s hybrid cloud infr
 
 ### Nexus (Hostinger VPS) — Public Edge / Ingress
 - Primary public-facing node
-- Traefik reverse proxy on 80/443
+- Nginx Proxy Manager on 80/443/81
 - Hosts the portfolio + routing layer + “front door” services
 - Only node that should expose services to the public internet
 
@@ -23,24 +23,24 @@ This repo is the operational blueprint for Shannon J. Love’s hybrid cloud infr
 ## Networking (Tailscale-First)
 - Tailscale is the default mesh networking layer (MagicDNS recommended)
 - WireGuard retained only as failover / emergency access
-- Goal: everything private by default, public only via Nexus + Traefik
+- Goal: everything private by default, public only via Nexus + Nginx Proxy Manager
 
 ## Container Runtime
 - Podman + podman-compose
-- Podman socket is used for Traefik provider discovery where required
+- Routing managed via Nginx Proxy Manager (GUI at :81)
 
 ## Repo Layout (PARA-aligned)
 - `00-MASTER-ARCHITECTURE/` — system overview, infra map, PARA structure
 - `01-DEPLOYMENT/` — node provisioning (Hostinger, Oracle, AWS, GCP)
-- `02-CONTAINERS/` — service modules (Traefik, BookStack, PhotoPrism, Stash, MCP servers)
+- `02-CONTAINERS/` — service modules (Nginx Proxy Manager, BookStack, PhotoPrism, Stash, MCP servers)
 - `03-AUTOMATION/` — tagging, routing, metadata persistence, versioning
 - `04-SECURITY/` — Tailscale, WireGuard failover, secrets management
 - `05-DOCS/` — full manual + troubleshooting
 
 ## Quickstart (Nexus)
-1. Bring up Traefik first
+1. Bring up Nginx Proxy Manager first (`docker compose up -d nginx-proxy-manager`)
 2. Attach services to `sjl_net`
-3. Route public traffic via Traefik labels
+3. Route public traffic via NPM admin UI at `:81`
 4. Keep secrets in `.env` (never committed)
 
 ## Security Rules (Non-negotiable)

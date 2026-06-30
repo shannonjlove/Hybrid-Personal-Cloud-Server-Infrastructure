@@ -15,20 +15,17 @@ services:
   # ---------------------------------------------------------------------------
   # REVERSE PROXY
   # ---------------------------------------------------------------------------
-  traefik:
-    image: traefik:latest
-    container_name: traefik
+  nginx-proxy-manager:
+    image: jc21/nginx-proxy-manager:latest
+    container_name: nginx-proxy-manager
     restart: unless-stopped
     ports:
       - "80:80"
       - "443:443"
+      - "81:81"   # Admin UI — restrict to Tailscale or localhost in production
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      - ./02-CONTAINERS/traefik/traefik.yml:/etc/traefik/traefik.yml:ro
-      - ./02-CONTAINERS/traefik/dynamic:/etc/traefik/dynamic:ro
-      - traefik-certs:/letsencrypt
-    labels:
-      - "traefik.enable=true"
+      - npm-data:/data
+      - npm-letsencrypt:/etc/letsencrypt
 
   # ---------------------------------------------------------------------------
   # DOCUMENTATION
@@ -38,7 +35,7 @@ services:
     container_name: bookstack
     restart: unless-stopped
     environment:
-      - APP_URL=https://docs.shannonjlove.cloud
+      - APP_URL=https://bookstack.shannonjlove.cloud
       - DB_HOST=bookstack-db
       - DB_DATABASE=${BOOKSTACK_DB_NAME}
       - DB_USERNAME=${BOOKSTACK_DB_USER}
@@ -47,10 +44,6 @@ services:
       - bookstack-data:/config
     depends_on:
       - bookstack-db
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.bookstack.rule=Host(`docs.shannonjlove.cloud`)"
-      - "traefik.http.routers.bookstack.tls.certresolver=letsencrypt"
 
   bookstack-db:
     image: mariadb:latest
@@ -77,16 +70,13 @@ services:
     volumes:
       - photoprism-data:/photoprism/storage
       - ~/Pictures:/photoprism/originals:ro
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.photoprism.rule=Host(`photos.shannonjlove.cloud`)"
-      - "traefik.http.routers.photoprism.tls.certresolver=letsencrypt"
 
 # =============================================================================
 # VOLUMES
 # =============================================================================
 volumes:
-  traefik-certs:
+  npm-data:
+  npm-letsencrypt:
   bookstack-data:
   bookstack-db-data:
   photoprism-data:

@@ -1,23 +1,9 @@
-# Traefik
+# ⚠️ Deprecated — Traefik
 
-Reverse proxy and SSL termination for all containerized services on Nexus VPS.
+Traefik has been removed from this infrastructure.
 
-## Role
-
-- Automatic SSL certificate management (Let's Encrypt)
-- HTTP-to-HTTPS redirect
-- Dynamic container discovery via Docker labels
-- Subdomain routing for *.shannonjlove.cloud
-
-## Migration
-
-Migrated from Caddy to Traefik for improved Docker integration and dynamic configuration.
-
-## Files (Planned)
-
-- `traefik.yml` — Static configuration
-- `dynamic/` — Dynamic route configurations
-- Docker Compose service definition
+**Replacement:** Nginx Proxy Manager — see `02-CONTAINERS/nginx-proxy-manager/`
 
 ---
-*No real credentials or private server details should be stored here.*
+*Traefik was previously used as the reverse proxy and SSL termination layer on Nexus.
+It was migrated away in favour of Nginx Proxy Manager for simpler GUI-driven proxy management.*

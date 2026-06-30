@@ -7,7 +7,7 @@
 - Backups and non-destructive exports
 
 ## Requires Approval
-- Any public exposure (ports, Traefik routers, DNS, TLS)
+- Any public exposure (ports, NPM proxy hosts, DNS, TLS)
 - Any key/token generation or rotation
 - Any container deployment or image updates
 - Any filesystem deletions or destructive actions

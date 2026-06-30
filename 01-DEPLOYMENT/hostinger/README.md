@@ -1,19 +1,19 @@
 # Hostinger VPS — Nexus Server
 
-Primary container host running Docker with Traefik reverse proxy.
+Primary container host running Docker with Nginx Proxy Manager.
 
 ## Server Details
 
 - **Hostname**: Nexus
 - **URL**: nexus.shannonjlove.cloud
-- **Reverse Proxy**: Traefik (migrated from Caddy)
+- **Reverse Proxy**: Nginx Proxy Manager (Admin UI: :81)
 - **Admin**: admin.shannonjlove.cloud
 
 ## Deployment Files
 
 This directory will contain:
 - Provisioning scripts
-- Traefik configuration
+- Nginx Proxy Manager configuration
 - DNS and SSL setup
 - Backup procedures
 

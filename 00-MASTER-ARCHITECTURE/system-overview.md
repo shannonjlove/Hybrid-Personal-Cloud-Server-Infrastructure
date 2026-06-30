@@ -17,10 +17,10 @@ A self-hosted, multi-cloud personal infrastructure spanning Hostinger VPS (Nexus
 |-------|---------|---------------|
 | Compute | VM hosting & containers | Hostinger VPS, Oracle Cloud ARM |
 | Networking | Secure mesh connectivity | Tailscale, WireGuard |
-| Reverse Proxy | Traffic routing & SSL | Traefik |
+| Reverse Proxy | Traffic routing & SSL | Nginx Proxy Manager |
 | Storage | File & document management | Cloud sync, Paperless-ngx |
 | Automation | Tagging, routing, versioning | Hazel, shell scripts, LaunchAgents |
-| Documentation | Knowledge base | BookStack (docs.shannonjlove.cloud) |
+| Documentation | Knowledge base | BookStack (bookstack.shannonjlove.cloud) |
 
 ### Domain
 

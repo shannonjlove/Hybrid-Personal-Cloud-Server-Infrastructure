@@ -5,7 +5,7 @@
 ### Hostinger VPS — Nexus Server
 - **Role**: Primary container host
 - **URL**: nexus.shannonjlove.cloud
-- **Reverse Proxy**: Traefik
+- **Reverse Proxy**: Nginx Proxy Manager
 - **Containers**: Paperless-ngx, PhotoPrism, Jellyfin, BookStack, and more
 - **Admin**: admin.shannonjlove.cloud
 
@@ -36,7 +36,9 @@ All servers connected via Tailscale mesh VPN (5 devices):
 ## Domain Architecture
 
 All services use `shannonjlove.cloud` with subdomains:
-- `docs.shannonjlove.cloud` — BookStack
+- `bookstack.shannonjlove.cloud` — BookStack (documentation)
+- `docs.shannonjlove.cloud` — Paperless-ngx (document management)
+- `photos.shannonjlove.cloud` — PhotoPrism
 - `admin.shannonjlove.cloud` — Admin panel
 - `nexus.shannonjlove.cloud` — Nexus VPS
 

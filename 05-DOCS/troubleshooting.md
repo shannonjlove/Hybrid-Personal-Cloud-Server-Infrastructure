@@ -17,16 +17,17 @@ Common issues and resolution steps for the hybrid cloud infrastructure.
 
 ## SSL / Certificate Issues
 
-### Traefik certificate errors
-1. Check Traefik dashboard for certificate status
-2. Verify DNS records point to correct IP
-3. Review Traefik logs: `docker logs traefik`
-4. Force certificate renewal if needed
+### NPM certificate errors
+1. Open NPM admin UI: `http://nexus.shannonjlove.cloud:81`
+2. Go to **SSL Certificates** → check expiry and status
+3. Verify DNS records point to correct IP: `dig subdomain.shannonjlove.cloud`
+4. Review NPM logs: `docker logs nginx-proxy-manager`
+5. Force renewal: edit the proxy host → SSL tab → Save (triggers Let's Encrypt re-issue)
 
 ### DNS not resolving
 1. Verify DNS configuration at registrar
 2. Check propagation: `dig subdomain.shannonjlove.cloud`
-3. Confirm Traefik routing rules match subdomain
+3. Confirm NPM proxy host domain matches subdomain exactly
 
 ## Docker / Container Issues
 
@@ -36,10 +37,11 @@ Common issues and resolution steps for the hybrid cloud infrastructure.
 3. Check available disk space: `df -h`
 4. Review port conflicts: `docker ps`
 
-### Traefik not routing
-1. Verify Docker labels on container
-2. Check Traefik dynamic configuration
-3. Restart Traefik: `docker restart traefik`
+### NPM not routing
+1. Open NPM admin UI → verify proxy host exists and is enabled
+2. Check NPM logs: `docker logs nginx-proxy-manager`
+3. Restart NPM: `docker restart nginx-proxy-manager`
+4. Confirm container is running and healthy: `docker ps`
 
 ## Tailscale Issues
 
