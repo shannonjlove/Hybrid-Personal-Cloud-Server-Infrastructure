@@ -13,6 +13,7 @@ Automated file and asset tagging based on PARA methodology.
 - 11 PARA-based Hazel rules
 - Shell scripts for batch tagging
 - LaunchAgents for scheduled tagging jobs
+- **File Warden** (`../file-warden/`) — cross-platform CLI for batch xattr tagging on Linux servers
 
 ---
 *Last updated: February 2026*

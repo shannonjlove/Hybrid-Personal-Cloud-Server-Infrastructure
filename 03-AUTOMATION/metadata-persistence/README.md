@@ -14,5 +14,9 @@ Ensuring file metadata (tags, links, attributes) survives moves, syncs, and clou
 - Sidecar file generators
 - Sync validation tools
 
+## Implemented
+
+- **File Warden** (`../file-warden/`) — applies and preserves `user.tags` xattr across reorganization runs; idempotent tagging survives repeated moves.
+
 ---
 *Last updated: February 2026*
