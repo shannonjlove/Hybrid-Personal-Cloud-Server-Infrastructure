@@ -1,22 +1,22 @@
 #!/usr/bin/env python3
 """
-Keon — Enhanced directory tree command.
+TreeCopy — Enhanced directory tree command.
 
 Provides tree display, JSON output, and directory structure replication.
 Python 3.7+ | stdlib only.
 
 Usage:
-  keon.py [directory] [options]
+  treecopy.py [directory] [options]
 
 Examples:
-  keon.py                              # tree of current directory
-  keon.py /srv -L 2 -a                 # 2 levels deep, include hidden files
-  keon.py /srv -d -I node_modules      # directories only, ignore pattern
-  keon.py /srv -s                      # show file sizes
-  keon.py /srv --json                  # JSON tree output
-  keon.py /srv -o tree.txt             # save to file
-  keon.py /srv --copy-to /backup       # replicate directory structure
-  keon.py /srv --copy-to /backup --copy-files --dry-run
+  treecopy.py                              # tree of current directory
+  treecopy.py /srv -L 2 -a                 # 2 levels deep, include hidden files
+  treecopy.py /srv -d -I node_modules      # directories only, ignore pattern
+  treecopy.py /srv -s                      # show file sizes
+  treecopy.py /srv --json                  # JSON tree output
+  treecopy.py /srv -o tree.txt             # save to file
+  treecopy.py /srv --copy-to /backup       # replicate directory structure
+  treecopy.py /srv --copy-to /backup --copy-files --dry-run
 """
 
 import argparse
@@ -266,8 +266,8 @@ def copy_structure(
 # ── CLI ────────────────────────────────────────────────────────────────────────
 def main() -> None:
     p = argparse.ArgumentParser(
-        prog='keon',
-        description='Keon — Enhanced directory tree command',
+        prog='treecopy',
+        description='TreeCopy — Enhanced directory tree command',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__,
     )
@@ -298,7 +298,7 @@ def main() -> None:
                    help='With --copy-to: also copy files (shutil.copy2)')
     p.add_argument('--dry-run', action='store_true',
                    help='With --copy-to: preview without making changes')
-    p.add_argument('--version', action='version', version='keon 2.0.0')
+    p.add_argument('--version', action='version', version='treecopy 2.0.0')
 
     args = p.parse_args()
 

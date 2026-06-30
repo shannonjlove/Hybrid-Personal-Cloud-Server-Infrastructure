@@ -1,15 +1,15 @@
 ---
-description: Run Keon — enhanced directory tree display, JSON output, and structure copy
+description: Run TreeCopy — enhanced directory tree display, JSON output, and structure copy
 argument-hint: [directory] [-L N] [-d] [-a] [-s] [--json] [--copy-to DEST] [--dry-run]
 ---
 
-You are invoking the Keon directory tree tool at `scripts/keon.py`.
+You are invoking the TreeCopy directory tree tool at `scripts/treecopy.py`.
 
 ## Common usage patterns
 
 ### Display tree
 ```bash
-python3 scripts/keon.py [directory] [options]
+python3 scripts/treecopy.py [directory] [options]
 ```
 
 ### Key flags
@@ -28,13 +28,13 @@ python3 scripts/keon.py [directory] [options]
 ### Replicate structure
 ```bash
 # Preview
-python3 scripts/keon.py <src> --copy-to <dest> --dry-run
+python3 scripts/treecopy.py <src> --copy-to <dest> --dry-run
 
 # Structure only
-python3 scripts/keon.py <src> --copy-to <dest>
+python3 scripts/treecopy.py <src> --copy-to <dest>
 
 # Structure + files
-python3 scripts/keon.py <src> --copy-to <dest> --copy-files
+python3 scripts/treecopy.py <src> --copy-to <dest> --copy-files
 ```
 
 ## Defaults
@@ -42,5 +42,5 @@ python3 scripts/keon.py <src> --copy-to <dest> --copy-files
 - Color: auto-detected (TTY-aware, respects `NO_COLOR` env var)
 
 ## Execution
-Run the appropriate keon.py command based on $ARGUMENTS. Show output to the user.
+Run the appropriate treecopy.py command based on $ARGUMENTS. Show output to the user.
 For copy operations, always confirm the dry-run output before proceeding to a live copy.
