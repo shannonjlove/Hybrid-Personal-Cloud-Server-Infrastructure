@@ -1,0 +1,21 @@
+[Unit]
+Description=WebDAV server for Working Copy iOS access
+After=network-online.target
+
+[Container]
+Image=httpd:alpine
+ContainerName=webdav
+PublishPort=8181:80
+Volume=%E/webdav/webdav.conf:/usr/local/apache2/conf/extra/webdav.conf:ro,Z
+Volume=%E/webdav/.htpasswd:/etc/webdav/.htpasswd:ro,Z
+Volume=webdav-data.volume:/data:Z
+Exec=sh -c "echo 'Include conf/extra/webdav.conf' >> /usr/local/apache2/conf/httpd.conf && httpd-foreground"
+Label=io.containers.autoupdate=registry
+AutoUpdate=registry
+
+[Service]
+Restart=always
+RestartSec=5s
+
+[Install]
+WantedBy=default.target

@@ -31,27 +31,6 @@ services:
       - "traefik.enable=true"
 
   # ---------------------------------------------------------------------------
-  # WEBDAV — Working Copy iOS access
-  # ---------------------------------------------------------------------------
-  webdav:
-    image: httpd:alpine
-    container_name: webdav
-    restart: unless-stopped
-    ports:
-      - "8181:80"
-    volumes:
-      - ./02-CONTAINERS/webdav/webdav.conf:/usr/local/apache2/conf/extra/webdav.conf:ro
-      - ./02-CONTAINERS/webdav/.htpasswd:/etc/webdav/.htpasswd:ro
-      - ${WEBDAV_DATA_DIR:-/opt/webdav-data}:/data
-    command: >
-      sh -c "echo 'Include conf/extra/webdav.conf' >> /usr/local/apache2/conf/httpd.conf && httpd-foreground"
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.webdav.rule=Host(`files.shannonjlove.cloud`)"
-      - "traefik.http.routers.webdav.tls.certresolver=letsencrypt"
-      - "traefik.http.services.webdav.loadbalancer.server.port=80"
-
-  # ---------------------------------------------------------------------------
   # DOCUMENTATION
   # ---------------------------------------------------------------------------
   bookstack:

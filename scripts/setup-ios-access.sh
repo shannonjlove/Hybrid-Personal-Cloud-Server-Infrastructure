@@ -1,25 +1,37 @@
 #!/usr/bin/env bash
 # Sets up server-side access for Working Copy iOS app.
-# Run once on the server after deploying the WebDAV container.
+# Deploys Podman quadlet files and generates WebDAV credentials.
 set -euo pipefail
 
+REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+QUADLET_DIR="${HOME}/.config/containers/systemd"
+CONFIG_DIR="${HOME}/.config/webdav"
 WEBDAV_USER="workingcopy"
 WEBDAV_PASS="${WEBDAV_PASSWORD:?Set WEBDAV_PASSWORD env var}"
-DATA_DIR="${WEBDAV_DATA_DIR:-/opt/webdav-data}"
-HTPASSWD_FILE="$(dirname "$0")/../02-CONTAINERS/webdav/.htpasswd"
 
-echo "==> Creating WebDAV data directory at $DATA_DIR"
-mkdir -p "$DATA_DIR"
+echo "==> Installing quadlet files"
+mkdir -p "$QUADLET_DIR"
+cp "$REPO_DIR/02-CONTAINERS/webdav/webdav.container" "$QUADLET_DIR/"
+cp "$REPO_DIR/02-CONTAINERS/webdav/webdav-data.volume" "$QUADLET_DIR/"
+systemctl --user daemon-reload
+echo "    Quadlets installed"
 
-echo "==> Writing htpasswd file"
+echo "==> Writing WebDAV config and credentials"
+mkdir -p "$CONFIG_DIR"
+cp "$REPO_DIR/02-CONTAINERS/webdav/webdav.conf" "$CONFIG_DIR/"
+
 if command -v htpasswd &>/dev/null; then
-    htpasswd -Bbn "$WEBDAV_USER" "$WEBDAV_PASS" > "$HTPASSWD_FILE"
+    htpasswd -Bbn "$WEBDAV_USER" "$WEBDAV_PASS" > "$CONFIG_DIR/.htpasswd"
 else
-    docker run --rm httpd:alpine htpasswd -Bbn "$WEBDAV_USER" "$WEBDAV_PASS" > "$HTPASSWD_FILE"
+    podman run --rm httpd:alpine htpasswd -Bbn "$WEBDAV_USER" "$WEBDAV_PASS" > "$CONFIG_DIR/.htpasswd"
 fi
 echo "    Credentials written for user: $WEBDAV_USER"
 
-echo "==> Setting up SSH authorized_keys for Working Copy"
+echo "==> Updating webdav.container to use config dir"
+sed -i "s|%E/webdav|$CONFIG_DIR|g" "$QUADLET_DIR/webdav.container"
+systemctl --user daemon-reload
+
+echo "==> Setting up SSH for Working Copy"
 AUTHORIZED_KEYS="$HOME/.ssh/authorized_keys"
 mkdir -p "$HOME/.ssh"
 chmod 700 "$HOME/.ssh"
@@ -29,21 +41,23 @@ chmod 600 "$AUTHORIZED_KEYS"
 if [ -n "${WORKING_COPY_SSH_PUBKEY:-}" ]; then
     if ! grep -qF "WorkingCopy@iPhone" "$AUTHORIZED_KEYS" 2>/dev/null; then
         echo "$WORKING_COPY_SSH_PUBKEY" >> "$AUTHORIZED_KEYS"
-        echo "    Added Working Copy public key to authorized_keys"
+        echo "    Working Copy SSH key added"
     else
         echo "    Working Copy key already present"
     fi
 else
-    echo "    WORKING_COPY_SSH_PUBKEY not set — skipping SSH key install"
-    echo "    Export it and re-run, or add manually:"
+    echo "    WORKING_COPY_SSH_PUBKEY not set — add it manually:"
     echo "    export WORKING_COPY_SSH_PUBKEY='ssh-rsa AAAA... WorkingCopy@iPhone-30062026'"
+    echo "    Then re-run this script"
 fi
 
+echo "==> Starting webdav service"
+systemctl --user enable --now webdav.service
+
 echo ""
-echo "Done. Start the WebDAV container with:"
-echo "  docker compose up -d webdav"
-echo ""
-echo "Working Copy connection details:"
-echo "  URL:      http://<server-tailscale-ip>:8181/"
+echo "Done. Working Copy connection details:"
+echo "  URL:      http://$(hostname -I | awk '{print $1}'):8181/"
 echo "  Username: $WEBDAV_USER"
-echo "  Password: (the value of WEBDAV_PASSWORD you set)"
+echo "  Password: (value of WEBDAV_PASSWORD)"
+echo ""
+echo "Over Tailscale: http://$(hostname):8181/"
