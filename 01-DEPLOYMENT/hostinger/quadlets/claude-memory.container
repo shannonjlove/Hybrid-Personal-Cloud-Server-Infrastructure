@@ -1,0 +1,18 @@
+[Unit]
+Description=Claude Memory MCP Server (memory_20250818 protocol)
+After=network-online.target
+Wants=network-online.target
+
+[Container]
+Image=localhost/claude-memory:latest
+ContainerName=claude-memory
+Volume=/opt/claude-memory/memories:/memories:Z
+Environment=MEMORY_ROOT=/memories
+Label=traefik.enable=false
+
+[Service]
+Restart=always
+TimeoutStartSec=60
+
+[Install]
+WantedBy=multi-user.target

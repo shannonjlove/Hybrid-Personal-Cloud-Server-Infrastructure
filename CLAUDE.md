@@ -26,13 +26,13 @@ Two memory backends are installed on every environment:
 - Binary: `ai-memory mcp --tier semantic` for Claude Code (stdio)
 - HTTP daemon: `ai-memory serve` → `http://127.0.0.1:9077` (for other agents)
 - Database: `~/.claude/ai-memory.db`
-- Cross-agent: available at `https://memory.shannonjlove.cloud` (Nexus only, via Traefik)
+- Cross-agent: available at `https://memory.shannonjlove.cloud` (Nexus only, proxied by Nginx Proxy Manager)
 
 ### Installing / updating memory tools on a node
 ```bash
 bash scripts/install-memory-tools.sh
 ```
-Auto-detects ARM64 (Oracle) vs x86_64 (Nexus/WebTop) and applies the correct Docker override.
+Auto-detects ARM64 (Oracle) vs x86_64 (Nexus/WebTop) and installs the correct Podman Quadlet unit files.
 
 ## Key directories
 
@@ -49,8 +49,7 @@ scripts/install-memory-tools.sh ← one-shot installer for any node
 
 ## Container management
 
-All containers use Docker Compose + Traefik on Nexus. Never commit real credentials.
-Environment variables come from `.env` files (gitignored).
+All containers run under **Podman Quadlets** (systemd `.container` units). Nginx Proxy Manager handles reverse proxy and SSL on Nexus. Never commit real credentials. Environment variables come from `.env` files (gitignored).
 
 ## Security rules
 

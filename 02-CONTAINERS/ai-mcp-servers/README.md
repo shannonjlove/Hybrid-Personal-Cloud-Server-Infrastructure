@@ -1,13 +1,14 @@
 # AI MCP Servers
 
 Memory and context services for Claude and other AI agents across all three environments.
+All services run as **Podman Quadlets** (systemd `.container` unit files).
 
 ## Services
 
 ### claude-memory
 Implements the **Anthropic `memory_20250818` protocol** as a local MCP server.
 
-- Transport: **stdio** (used by Claude Code directly)
+- Transport: **stdio** (Claude Code calls it directly as an MCP server)
 - Storage: filesystem under `~/.claude/memories/`
 - Commands: `view`, `create`, `str_replace`, `insert`, `delete`, `rename`
 - Path traversal protection built in
@@ -21,6 +22,7 @@ Implements the **Anthropic `memory_20250818` protocol** as a local MCP server.
 - Storage: SQLite at `~/.claude/ai-memory.db`
 - Tiers: keyword → semantic → smart → autonomous
 - License: Apache 2.0
+- On Nexus: `memory.shannonjlove.cloud` proxied by Nginx Proxy Manager → `127.0.0.1:9077`
 
 ## Installation
 
@@ -30,23 +32,25 @@ Run on each node (auto-detects ARM64 vs x86_64):
 bash scripts/install-memory-tools.sh
 ```
 
-This installs binaries, deploys Docker services, and writes `.claude/settings.json`.
+Builds Podman images, copies Quadlet unit files to `/etc/containers/systemd/`,
+reloads systemd, and starts both services.
 
-## Docker Compose
+## Quadlet unit files
 
-```bash
-# Nexus VPS / WebTop (x86_64)
-docker compose \
-  -f 02-CONTAINERS/ai-mcp-servers/docker-compose.yml \
-  -f 01-DEPLOYMENT/hostinger/memory-compose.override.yml \
-  up -d --build
+Per-environment `.container` files live in:
 
-# Oracle sOs (ARM64)
-docker compose \
-  -f 02-CONTAINERS/ai-mcp-servers/docker-compose.yml \
-  -f 01-DEPLOYMENT/oracle/memory-compose.override.yml \
-  up -d --build
 ```
+01-DEPLOYMENT/hostinger/quadlets/   ← Nexus VPS + WebTop (x86_64)
+  claude-memory.container
+  ai-memory.container
+
+01-DEPLOYMENT/oracle/quadlets/      ← sOs (ARM64)
+  claude-memory.container
+  ai-memory.container
+```
+
+The install script copies the correct set to `/etc/containers/systemd/` and
+calls `systemctl daemon-reload` + `systemctl enable --now`.
 
 ## Architecture
 
@@ -56,20 +60,19 @@ Claude Code CLI
   └── MCP stdio → ai-memory binary          → ~/.claude/ai-memory.db
 
 Other AI agents / API integrations
-  └── HTTP → ai-memory HTTP daemon (Docker, :9077)
-           → https://memory.shannonjlove.cloud (Nexus via Traefik)
+  └── HTTP → ai-memory Podman service (:9077)
+           → https://memory.shannonjlove.cloud  (Nexus via Nginx Proxy Manager)
 ```
 
-## Files
+## Source files
 
 ```
 claude-memory/
   server.py          MCP server implementing memory_20250818 protocol
   requirements.txt   mcp[cli]>=1.0.0
-  Dockerfile         python:3.12-slim image
+  Dockerfile         python:3.12-slim image (built by install script)
 ai-memory/
   Dockerfile         Multi-arch Rust build (amd64 + arm64)
-docker-compose.yml   Both services (base config)
 ```
 
 ---
