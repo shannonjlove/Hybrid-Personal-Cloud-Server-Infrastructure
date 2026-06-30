@@ -26,6 +26,7 @@ services:
       - ./mcp-config.json:/config/.config/Claude/claude_desktop_config.json:ro
       - ./init/install-uv.sh:/config/custom-cont-init.d/install-uv.sh:ro
       - ./init/install-media-tools.sh:/config/custom-cont-init.d/install-media-tools.sh:ro
+      - ./init/install-oci-mcp.sh:/config/custom-cont-init.d/install-oci-mcp.sh:ro
     shm_size: "1gb"
     networks:
       - webtop-net

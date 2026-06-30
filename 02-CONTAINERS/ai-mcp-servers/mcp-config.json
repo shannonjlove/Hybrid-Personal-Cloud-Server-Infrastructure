@@ -17,6 +17,13 @@
     "mediaProcessor": {
       "command": "npx",
       "args": ["-y", "mcp-media-processor@latest"]
+    },
+    "mcp-server-oci": {
+      "command": "uv",
+      "args": ["--directory", "/opt/mcp-server-oci", "run", "python", "-m", "mcp_server_oci.mcp_server"],
+      "env": {
+        "FASTMCP_LOG_LEVEL": "INFO"
+      }
     }
   }
 }
