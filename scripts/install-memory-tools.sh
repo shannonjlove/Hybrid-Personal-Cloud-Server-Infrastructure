@@ -56,6 +56,12 @@ fi
 # -----------------------------------------------------------------------------
 echo "==> Installing claude-memory MCP server..."
 mkdir -p "${CLAUDE_MEMORY_LIB}" "${MEMORY_DIR}"
+
+# Seed persistent memory with infrastructure rules (overwrites — repo is source of truth)
+cp "${REPO_ROOT}/02-CONTAINERS/ai-mcp-servers/claude-memory/seed-memories/infrastructure-rules.md" \
+   "${MEMORY_DIR}/infrastructure-rules.md"
+echo "    Seeded: ${MEMORY_DIR}/infrastructure-rules.md"
+
 cp "${REPO_ROOT}/02-CONTAINERS/ai-mcp-servers/claude-memory/server.py" \
    "${CLAUDE_MEMORY_LIB}/server.py"
 
