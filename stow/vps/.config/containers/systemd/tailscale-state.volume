@@ -1,0 +1,4 @@
+[Volume]
+VolumeName=tailscale-state
+Label=app=tailscale
+Label=entity=vps

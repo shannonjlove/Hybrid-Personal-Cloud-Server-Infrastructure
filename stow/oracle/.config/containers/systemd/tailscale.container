@@ -1,0 +1,26 @@
+[Unit]
+Description=Tailscale daemon — Oracle sOs ARM
+After=network-online.target
+
+[Container]
+Image=tailscale/tailscale:latest
+ContainerName=tailscale
+Network=host
+HostName=sOs
+Volume=tailscale-state.volume:/var/lib/tailscale:Z
+Volume=/dev/net/tun:/dev/net/tun
+AddCapability=NET_ADMIN
+AddCapability=NET_RAW
+EnvironmentFile=%h/.config/ai-keys/shared.env
+Environment=TS_STATE_DIR=/var/lib/tailscale
+Environment=TS_SOCKET=/var/run/tailscale/tailscaled.sock
+Environment=TS_EXTRA_ARGS=--advertise-tags=tag:server --ssh
+Environment=TS_USERSPACE=false
+AutoUpdate=registry
+
+[Service]
+Restart=always
+RestartSec=5s
+
+[Install]
+WantedBy=default.target

@@ -1,0 +1,17 @@
+[Unit]
+Description=Nginx — WebTop desktop frontend proxy
+After=network-online.target tailscale.service
+
+[Container]
+Image=nginx:alpine
+ContainerName=nginx
+PublishPort=80:80
+Volume=%E/nginx/nginx.conf:/etc/nginx/nginx.conf:ro,Z
+AutoUpdate=registry
+
+[Service]
+Restart=always
+RestartSec=5s
+
+[Install]
+WantedBy=default.target
