@@ -1,63 +1,80 @@
 #!/usr/bin/env bash
-# Sets up server-side access for Working Copy iOS app.
-# Deploys Podman quadlet files and generates WebDAV credentials.
+# Sets up server-side Working Copy iOS access and shared AI environment.
+# Run once on the server after cloning the repo.
 set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 QUADLET_DIR="${HOME}/.config/containers/systemd"
-CONFIG_DIR="${HOME}/.config/webdav"
+AI_KEYS_DIR="${HOME}/.config/ai-keys"
+WEBDAV_CONFIG_DIR="${HOME}/.config/webdav"
 WEBDAV_USER="workingcopy"
 WEBDAV_PASS="${WEBDAV_PASSWORD:?Set WEBDAV_PASSWORD env var}"
 
-echo "==> Installing quadlet files"
-mkdir -p "$QUADLET_DIR"
-cp "$REPO_DIR/02-CONTAINERS/webdav/webdav.container" "$QUADLET_DIR/"
-cp "$REPO_DIR/02-CONTAINERS/webdav/webdav-data.volume" "$QUADLET_DIR/"
-systemctl --user daemon-reload
-echo "    Quadlets installed"
-
-echo "==> Writing WebDAV config and credentials"
-mkdir -p "$CONFIG_DIR"
-cp "$REPO_DIR/02-CONTAINERS/webdav/webdav.conf" "$CONFIG_DIR/"
-
-if command -v htpasswd &>/dev/null; then
-    htpasswd -Bbn "$WEBDAV_USER" "$WEBDAV_PASS" > "$CONFIG_DIR/.htpasswd"
-else
-    podman run --rm httpd:alpine htpasswd -Bbn "$WEBDAV_USER" "$WEBDAV_PASS" > "$CONFIG_DIR/.htpasswd"
-fi
-echo "    Credentials written for user: $WEBDAV_USER"
-
-echo "==> Updating webdav.container to use config dir"
-sed -i "s|%E/webdav|$CONFIG_DIR|g" "$QUADLET_DIR/webdav.container"
-systemctl --user daemon-reload
-
-echo "==> Setting up SSH for Working Copy"
-AUTHORIZED_KEYS="$HOME/.ssh/authorized_keys"
-mkdir -p "$HOME/.ssh"
-chmod 700 "$HOME/.ssh"
+# --- SSH: Working Copy public key -------------------------------------------
+echo "==> Installing Working Copy SSH public key"
+AUTHORIZED_KEYS="${HOME}/.ssh/authorized_keys"
+mkdir -p "${HOME}/.ssh"
+chmod 700 "${HOME}/.ssh"
 touch "$AUTHORIZED_KEYS"
 chmod 600 "$AUTHORIZED_KEYS"
 
-if [ -n "${WORKING_COPY_SSH_PUBKEY:-}" ]; then
-    if ! grep -qF "WorkingCopy@iPhone" "$AUTHORIZED_KEYS" 2>/dev/null; then
-        echo "$WORKING_COPY_SSH_PUBKEY" >> "$AUTHORIZED_KEYS"
-        echo "    Working Copy SSH key added"
+WC_KEY_FILE="$REPO_DIR/04-SECURITY/ssh/authorized_keys"
+while IFS= read -r key; do
+    [[ -z "$key" || "$key" == \#* ]] && continue
+    if ! grep -qF "${key##* }" "$AUTHORIZED_KEYS" 2>/dev/null; then
+        echo "$key" >> "$AUTHORIZED_KEYS"
+        echo "    Added: ${key##* }"
     else
-        echo "    Working Copy key already present"
+        echo "    Already present: ${key##* }"
     fi
+done < "$WC_KEY_FILE"
+
+# --- Shared AI env file ------------------------------------------------------
+echo "==> Initialising shared AI env at $AI_KEYS_DIR"
+mkdir -p "$AI_KEYS_DIR"
+chmod 700 "$AI_KEYS_DIR"
+
+if [ ! -f "$AI_KEYS_DIR/shared.env" ]; then
+    cp "$REPO_DIR/shared.env.template" "$AI_KEYS_DIR/shared.env"
+    chmod 600 "$AI_KEYS_DIR/shared.env"
+    echo "    Created shared.env from template — fill in your keys"
 else
-    echo "    WORKING_COPY_SSH_PUBKEY not set — add it manually:"
-    echo "    export WORKING_COPY_SSH_PUBKEY='ssh-rsa AAAA... WorkingCopy@iPhone-30062026'"
-    echo "    Then re-run this script"
+    echo "    shared.env already exists — not overwritten"
 fi
 
-echo "==> Starting webdav service"
-systemctl --user enable --now webdav.service
+# --- WebDAV credentials ------------------------------------------------------
+echo "==> Writing WebDAV credentials"
+mkdir -p "$WEBDAV_CONFIG_DIR"
+cp "$REPO_DIR/02-CONTAINERS/webdav/webdav.conf" "$WEBDAV_CONFIG_DIR/"
 
+if command -v htpasswd &>/dev/null; then
+    htpasswd -Bbn "$WEBDAV_USER" "$WEBDAV_PASS" > "$WEBDAV_CONFIG_DIR/.htpasswd"
+else
+    podman run --rm httpd:alpine htpasswd -Bbn "$WEBDAV_USER" "$WEBDAV_PASS" \
+        > "$WEBDAV_CONFIG_DIR/.htpasswd"
+fi
+chmod 600 "$WEBDAV_CONFIG_DIR/.htpasswd"
+echo "    htpasswd written for user: $WEBDAV_USER"
+
+# --- Quadlets ----------------------------------------------------------------
+echo "==> Installing Podman quadlets"
+mkdir -p "$QUADLET_DIR"
+sed "s|%E/webdav|$WEBDAV_CONFIG_DIR|g" \
+    "$REPO_DIR/02-CONTAINERS/webdav/webdav.container" \
+    > "$QUADLET_DIR/webdav.container"
+systemctl --user daemon-reload
+systemctl --user enable --now webdav.service
+echo "    webdav.service started"
+
+# --- Done --------------------------------------------------------------------
 echo ""
-echo "Done. Working Copy connection details:"
-echo "  URL:      http://$(hostname -I | awk '{print $1}'):8181/"
-echo "  Username: $WEBDAV_USER"
-echo "  Password: (value of WEBDAV_PASSWORD)"
+echo "======================================================"
+echo " Working Copy WebDAV"
+echo "   URL:  http://$(hostname -I | awk '{print $1}'):8181/"
+echo "   Over Tailscale: http://$(hostname):8181/"
+echo "   User: $WEBDAV_USER"
+echo "   Pass: (value of WEBDAV_PASSWORD)"
 echo ""
-echo "Over Tailscale: http://$(hostname):8181/"
+echo " Shared AI env: $AI_KEYS_DIR/shared.env"
+echo "   Fill in API keys, then reload dependent services."
+echo "======================================================"
