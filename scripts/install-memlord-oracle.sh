@@ -1,44 +1,50 @@
 #!/usr/bin/env bash
-# Deploy memlord to Oracle sOs (150.136.77.26 / Tailscale 100.67.229.94)
+# Deploy memlord to Oracle sOs via Podman Quadlets.
 # Run from the repo root on your local machine.
 set -euo pipefail
 
 ORACLE_HOST="${ORACLE_HOST:-100.67.229.94}"   # prefer Tailscale
 ORACLE_USER="${ORACLE_USER:-ubuntu}"
-REMOTE_DIR="~/memlord"
-COMPOSE_SRC="02-CONTAINERS/memlord/docker-compose.oracle.yml"
-ENV_SRC="02-CONTAINERS/memlord/.env.example"
 
-echo "→ Deploying memlord to Oracle sOs ($ORACLE_USER@$ORACLE_HOST)"
+echo "→ Deploying memlord quadlets to Oracle sOs ($ORACLE_USER@$ORACLE_HOST)"
 
-# Create remote directory
-ssh "$ORACLE_USER@$ORACLE_HOST" "mkdir -p $REMOTE_DIR"
+# Copy quadlet files
+scp quadlets/oracle/*.container \
+    quadlets/oracle/*.volume \
+    quadlets/oracle/*.network \
+    "$ORACLE_USER@$ORACLE_HOST:/tmp/"
 
-# Copy compose file
-scp "$COMPOSE_SRC" "$ORACLE_USER@$ORACLE_HOST:$REMOTE_DIR/docker-compose.yml"
+ssh "$ORACLE_USER@$ORACLE_HOST" "sudo mv /tmp/*.container /tmp/*.volume /tmp/*.network /etc/containers/systemd/ 2>/dev/null || true"
 
-# Copy env template only if no .env exists yet
+# Copy env template only if no env file exists yet
+ssh "$ORACLE_USER@$ORACLE_HOST" \
+  "[ -f /etc/containers/systemd/memlord.env ] && echo '  .env already exists — skipping' || true"
+scp quadlets/oracle/memlord.env.example "$ORACLE_USER@$ORACLE_HOST:/tmp/memlord.env.example"
 ssh "$ORACLE_USER@$ORACLE_HOST" "
-  if [ ! -f $REMOTE_DIR/.env ]; then
-    echo '.env not found — copying example template'
-  fi
+  sudo bash -c '
+    if [ ! -f /etc/containers/systemd/memlord.env ]; then
+      cp /tmp/memlord.env.example /etc/containers/systemd/memlord.env
+      chmod 600 /etc/containers/systemd/memlord.env
+      echo \"  Env template installed. Edit /etc/containers/systemd/memlord.env before starting.\"
+    fi
+  '
 "
-scp -n "$ENV_SRC" "$ORACLE_USER@$ORACLE_HOST:$REMOTE_DIR/.env" 2>/dev/null || \
-  echo "  .env already exists on remote — skipping to preserve existing secrets"
 
 echo ""
-echo "⚠  Before starting, SSH in and edit the .env file:"
+echo "⚠  Before starting, fill in secrets on Oracle:"
 echo "   ssh $ORACLE_USER@$ORACLE_HOST"
-echo "   nano $REMOTE_DIR/.env"
+echo "   sudo nano /etc/containers/systemd/memlord.env"
 echo ""
-echo "→ Then start the stack:"
-echo "   ssh $ORACLE_USER@$ORACLE_HOST 'cd $REMOTE_DIR && docker compose up -d'"
+echo "→ Then activate:"
+echo "   sudo systemctl daemon-reload"
+echo "   sudo systemctl enable --now memlord-db.service memlord.service"
 echo ""
 
-# Install memstate-mcp config for Claude Code on Oracle
-echo "→ Installing memstate-mcp MCP config for Claude Code on Oracle..."
+# Install MCP config for Claude Code on Oracle
+echo "→ Installing MCP config for Claude Code on Oracle..."
 ssh "$ORACLE_USER@$ORACLE_HOST" "mkdir -p ~/.claude"
 scp "02-CONTAINERS/ai-mcp-servers/mcp-config.json" \
     "$ORACLE_USER@$ORACLE_HOST:~/.claude/claude_desktop_config.json"
 
 echo "✓ Done. Update MEMSTATE_API_KEY in ~/.claude/claude_desktop_config.json on Oracle."
+echo "  Also run: claude mcp add cloudflare --transport http https://mcp.cloudflare.com/mcp"

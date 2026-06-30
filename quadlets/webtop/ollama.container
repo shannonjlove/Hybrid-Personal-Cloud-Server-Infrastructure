@@ -1,0 +1,20 @@
+[Unit]
+Description=Ollama Local LLM Server
+After=network-online.target webtop-network.service
+Requires=webtop-network.service
+
+[Container]
+Image=docker.io/ollama/ollama:latest
+ContainerName=ollama
+Volume=ollama-data.volume:/root/.ollama
+Network=webtop.network
+# Uncomment for NVIDIA GPU passthrough (requires nvidia-container-toolkit):
+# AddDevice=/dev/nvidia0
+# AddDevice=/dev/nvidiactl
+# AddDevice=/dev/nvidia-uvm
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=multi-user.target default.target

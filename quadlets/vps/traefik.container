@@ -1,0 +1,22 @@
+[Unit]
+Description=Traefik Reverse Proxy
+After=network-online.target infra-network.service
+Requires=infra-network.service
+
+[Container]
+Image=docker.io/traefik:latest
+ContainerName=traefik
+PublishPort=80:80
+PublishPort=443:443
+Volume=/run/podman/podman.sock:/var/run/docker.sock:ro
+Volume=/etc/infra/traefik/traefik.yml:/etc/traefik/traefik.yml:ro
+Volume=/etc/infra/traefik/dynamic:/etc/traefik/dynamic:ro
+Volume=traefik-certs.volume:/letsencrypt
+Label=traefik.enable=true
+Network=infra.network
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=multi-user.target default.target

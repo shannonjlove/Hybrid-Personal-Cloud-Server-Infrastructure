@@ -16,6 +16,9 @@
       "env": {
         "OLLAMA_HOST": "http://ollama:11434"
       }
+    },
+    "cloudflare": {
+      "url": "https://mcp.cloudflare.com/mcp"
     }
   }
 }

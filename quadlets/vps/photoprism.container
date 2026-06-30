@@ -1,0 +1,23 @@
+[Unit]
+Description=PhotoPrism Photo Management
+After=network-online.target infra-network.service
+Requires=infra-network.service
+
+[Container]
+Image=docker.io/photoprism/photoprism:latest
+ContainerName=photoprism
+EnvironmentFile=/etc/containers/systemd/infra.env
+Environment=PHOTOPRISM_ADMIN_PASSWORD=%E{PHOTOPRISM_ADMIN_PASS}
+Environment=PHOTOPRISM_SITE_URL=https://photos.shannonjlove.cloud
+Volume=photoprism-data.volume:/photoprism/storage
+Volume=%h/Pictures:/photoprism/originals:ro
+Network=infra.network
+Label=traefik.enable=true
+Label=traefik.http.routers.photoprism.rule=Host(`photos.shannonjlove.cloud`)
+Label=traefik.http.routers.photoprism.tls.certresolver=letsencrypt
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=multi-user.target default.target

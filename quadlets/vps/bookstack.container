@@ -1,0 +1,25 @@
+[Unit]
+Description=BookStack Documentation
+After=network-online.target bookstack-db.service
+Requires=bookstack-db.service
+
+[Container]
+Image=lscr.io/linuxserver/bookstack:latest
+ContainerName=bookstack
+EnvironmentFile=/etc/containers/systemd/infra.env
+Environment=APP_URL=https://docs.shannonjlove.cloud
+Environment=DB_HOST=bookstack-db
+Environment=DB_DATABASE=%E{BOOKSTACK_DB_NAME}
+Environment=DB_USERNAME=%E{BOOKSTACK_DB_USER}
+Environment=DB_PASSWORD=%E{BOOKSTACK_DB_PASS}
+Volume=bookstack-data.volume:/config
+Network=infra.network
+Label=traefik.enable=true
+Label=traefik.http.routers.bookstack.rule=Host(`docs.shannonjlove.cloud`)
+Label=traefik.http.routers.bookstack.tls.certresolver=letsencrypt
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=multi-user.target default.target

@@ -1,0 +1,32 @@
+[Unit]
+Description=WebTop Browser-Accessible Linux Desktop
+After=network-online.target ollama.service webtop-network.service infra-network.service
+Requires=ollama.service webtop-network.service infra-network.service
+
+[Container]
+Image=lscr.io/linuxserver/webtop:ubuntu-kde
+ContainerName=webtop
+SecurityLabelDisable=true
+EnvironmentFile=/etc/containers/systemd/webtop.env
+Environment=PUID=1000
+Environment=PGID=1000
+Environment=TZ=%E{TZ}
+Environment=TITLE=Shannon Cloud Desktop
+Volume=webtop-data.volume:/config
+Volume=/etc/infra/webtop/mcp-config.json:/config/.config/Claude/claude_desktop_config.json:ro
+Volume=/etc/infra/webtop/init/install-uv.sh:/config/custom-cont-init.d/install-uv.sh:ro
+ShmSize=1g
+Network=webtop.network
+Network=infra.network
+Label=traefik.enable=true
+Label=traefik.http.routers.webtop.rule=Host(`desktop.shannonjlove.cloud`)
+Label=traefik.http.routers.webtop.tls.certresolver=letsencrypt
+Label=traefik.http.services.webtop.loadbalancer.server.port=3000
+Label=traefik.http.routers.webtop.middlewares=webtop-auth
+Label=traefik.http.middlewares.webtop-auth.basicauth.users=%E{WEBTOP_BASIC_AUTH}
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=multi-user.target default.target

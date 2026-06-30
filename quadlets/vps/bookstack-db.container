@@ -1,0 +1,26 @@
+[Unit]
+Description=BookStack Database (MariaDB)
+After=network-online.target infra-network.service
+Requires=infra-network.service
+
+[Container]
+Image=docker.io/mariadb:latest
+ContainerName=bookstack-db
+EnvironmentFile=/etc/containers/systemd/infra.env
+Environment=MYSQL_ROOT_PASSWORD=%E{BOOKSTACK_DB_ROOT_PASS}
+Environment=MYSQL_DATABASE=%E{BOOKSTACK_DB_NAME}
+Environment=MYSQL_USER=%E{BOOKSTACK_DB_USER}
+Environment=MYSQL_PASSWORD=%E{BOOKSTACK_DB_PASS}
+Volume=bookstack-db-data.volume:/var/lib/mysql
+Network=infra.network
+HealthCmd=/usr/local/bin/healthcheck.sh --connect --innodb_initialized
+HealthInterval=10s
+HealthTimeout=5s
+HealthRetries=3
+HealthStartPeriod=30s
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=multi-user.target default.target

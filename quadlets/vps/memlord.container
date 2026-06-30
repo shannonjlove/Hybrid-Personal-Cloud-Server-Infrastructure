@@ -1,0 +1,31 @@
+[Unit]
+Description=memlord MCP Memory Server
+After=network-online.target memlord-db.service
+Requires=memlord-db.service
+
+[Container]
+Image=ghcr.io/myrikld/memlord:latest
+ContainerName=memlord
+EnvironmentFile=/etc/containers/systemd/infra.env
+Environment=MEMLORD_DB_URL=postgresql+asyncpg://postgres:%E{MEMLORD_DB_PASS}@memlord-db/memlord
+Environment=MEMLORD_HOST=0.0.0.0
+Environment=MEMLORD_PORT=8000
+Environment=MEMLORD_BASE_URL=https://memory.shannonjlove.cloud
+Environment=MEMLORD_OAUTH_JWT_SECRET=%E{MEMLORD_JWT_SECRET}
+Volume=memlord-onnx.volume:/app/src/memlord/onnx
+Network=infra.network
+Label=traefik.enable=true
+Label=traefik.http.routers.memlord.rule=Host(`memory.shannonjlove.cloud`)
+Label=traefik.http.routers.memlord.tls.certresolver=letsencrypt
+Label=traefik.http.services.memlord.loadbalancer.server.port=8000
+HealthCmd=/bin/sh -c "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\""
+HealthInterval=30s
+HealthTimeout=5s
+HealthRetries=3
+HealthStartPeriod=30s
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=multi-user.target default.target

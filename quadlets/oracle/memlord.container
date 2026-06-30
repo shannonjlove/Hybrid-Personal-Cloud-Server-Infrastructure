@@ -1,0 +1,28 @@
+[Unit]
+Description=memlord MCP Memory Server (Oracle sOs)
+After=network-online.target memlord-db.service
+Requires=memlord-db.service
+
+[Container]
+Image=ghcr.io/myrikld/memlord:latest
+ContainerName=memlord
+EnvironmentFile=/etc/containers/systemd/memlord.env
+Environment=MEMLORD_DB_URL=postgresql+asyncpg://postgres:%E{MEMLORD_DB_PASS}@memlord-db/memlord
+Environment=MEMLORD_HOST=0.0.0.0
+Environment=MEMLORD_PORT=8000
+Environment=MEMLORD_BASE_URL=%E{MEMLORD_BASE_URL}
+Environment=MEMLORD_OAUTH_JWT_SECRET=%E{MEMLORD_JWT_SECRET}
+Volume=memlord-onnx.volume:/app/src/memlord/onnx
+PublishPort=8000:8000
+Network=memlord.network
+HealthCmd=/bin/sh -c "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\""
+HealthInterval=30s
+HealthTimeout=5s
+HealthRetries=3
+HealthStartPeriod=30s
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=multi-user.target default.target

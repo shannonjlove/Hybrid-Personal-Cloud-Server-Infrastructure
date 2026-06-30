@@ -1,0 +1,26 @@
+[Unit]
+Description=memlord PostgreSQL + pgvector Database (Oracle sOs)
+After=network-online.target memlord-network.service
+Requires=memlord-network.service
+
+[Container]
+Image=docker.io/pgvector/pgvector:pg17
+ContainerName=memlord-db
+EnvironmentFile=/etc/containers/systemd/memlord.env
+Environment=PGDATA=/var/lib/postgresql/data/pgdata
+Environment=POSTGRES_USER=postgres
+Environment=POSTGRES_PASSWORD=%E{MEMLORD_DB_PASS}
+Environment=POSTGRES_DB=memlord
+Volume=memlord-db-data.volume:/var/lib/postgresql/data/pgdata
+Network=memlord.network
+HealthCmd=/bin/sh -c "pg_isready -d memlord -U postgres"
+HealthInterval=10s
+HealthTimeout=5s
+HealthRetries=3
+HealthStartPeriod=60s
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=multi-user.target default.target
