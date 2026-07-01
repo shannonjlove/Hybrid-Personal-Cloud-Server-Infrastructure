@@ -1,0 +1,83 @@
+# =============================================================================
+# 220020 SJL JELLYFIN — Docker Compose Service Definition
+# Include via: docker compose -f docker-compose.yml -f 02-CONTAINERS/jellyfin/220020_...yml up
+# Prerequisites: rclone VFS mounts active (run 220010_...install-vfs-mounts.sh first)
+#                /mnt/sjl-cloud/* must be mounted on the host before starting this service
+# =============================================================================
+
+services:
+
+  # ---------------------------------------------------------------------------
+  # MEDIA SERVER — Jellyfin
+  # Library paths map to rclone VFS mounts on the host
+  # ---------------------------------------------------------------------------
+  jellyfin:
+    image: jellyfin/jellyfin:latest
+    container_name: sjl-jellyfin
+    restart: unless-stopped
+    user: "1000:1000"
+    environment:
+      - JELLYFIN_PublishedServerUrl=https://media.shannonjlove.cloud
+      - TZ=America/Chicago
+    volumes:
+      - jellyfin-config:/config
+      - jellyfin-cache:/cache
+      # rclone VFS mounts (host must have these mounted first)
+      - /mnt/sjl-cloud/idrive-primary:/media/idrive-primary:ro,shared
+      - /mnt/sjl-cloud/pcloud-sjl:/media/pcloud-sjl:ro,shared
+      - /mnt/sjl-cloud/dropbox-sjl:/media/dropbox-sjl:ro,shared
+    # Required to see host FUSE mounts inside the container
+    security_opt:
+      - apparmor:unconfined
+    cap_add:
+      - SYS_ADMIN
+    devices:
+      - /dev/dri:/dev/dri
+    group_add:
+      - render
+      - video
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.jellyfin.rule=Host(`media.shannonjlove.cloud`)"
+      - "traefik.http.routers.jellyfin.tls.certresolver=letsencrypt"
+      - "traefik.http.services.jellyfin.loadbalancer.server.port=8096"
+
+  # ---------------------------------------------------------------------------
+  # MEDIA ORGANIZER — Stash
+  # Self-hosted media tagging and library management
+  # ---------------------------------------------------------------------------
+  stash:
+    image: stashapp/stash:latest
+    container_name: sjl-stash
+    restart: unless-stopped
+    environment:
+      - STASH_STASH=/media/idrive-primary
+      - STASH_GENERATED=/generated
+      - STASH_METADATA=/metadata
+      - STASH_CACHE=/cache
+      - STASH_PORT=9999
+    volumes:
+      - stash-config:/root/.stash
+      - stash-generated:/generated
+      - stash-metadata:/metadata
+      - stash-cache:/cache
+      # rclone VFS mounts
+      - /mnt/sjl-cloud/idrive-primary:/media/idrive-primary:ro,shared
+      - /mnt/sjl-cloud/pcloud-sjl:/media/pcloud-sjl:ro,shared
+    security_opt:
+      - apparmor:unconfined
+    cap_add:
+      - SYS_ADMIN
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.stash.rule=Host(`stash.shannonjlove.cloud`)"
+      - "traefik.http.routers.stash.tls.certresolver=letsencrypt"
+      - "traefik.http.services.stash.loadbalancer.server.port=9999"
+
+volumes:
+  jellyfin-config:
+  jellyfin-cache:
+  stash-config:
+  stash-generated:
+  stash-metadata:
+  stash-cache:

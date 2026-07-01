@@ -1,0 +1,39 @@
+# =============================================================================
+# 220001 SJL JELLYFIN — rclone VFS Mount: pCloud SJL
+# Systemd service — install to /etc/systemd/system/
+# Requires: rclone config at /etc/rclone/rclone.conf (root-owned, 600)
+#           fuse3 package, /mnt/sjl-cloud/pcloud-sjl mount point
+# =============================================================================
+[Unit]
+Description=SJL rclone VFS — pCloud SJL
+Documentation=https://rclone.org/commands/rclone_mount/
+After=network-online.target
+Wants=network-online.target
+AssertPathIsDirectory=/mnt/sjl-cloud/pcloud-sjl
+
+[Service]
+Type=notify
+User=root
+ExecStartPre=/bin/mkdir -p /mnt/sjl-cloud/pcloud-sjl
+ExecStartPre=/bin/mkdir -p /var/log/rclone
+ExecStart=/usr/bin/rclone mount pcloud-sjl: /mnt/sjl-cloud/pcloud-sjl \
+    --config /etc/rclone/rclone.conf \
+    --allow-other \
+    --dir-cache-time 72h \
+    --vfs-cache-mode full \
+    --vfs-cache-max-size 10G \
+    --vfs-cache-max-age 24h \
+    --vfs-read-chunk-size 128M \
+    --vfs-read-chunk-size-limit 2G \
+    --buffer-size 256M \
+    --poll-interval 30s \
+    --log-level INFO \
+    --log-file /var/log/rclone/220001-pcloud-sjl-vfs.log
+ExecStop=/bin/fusermount3 -uz /mnt/sjl-cloud/pcloud-sjl
+Restart=on-failure
+RestartSec=10
+TimeoutStartSec=60
+KillMode=process
+
+[Install]
+WantedBy=multi-user.target

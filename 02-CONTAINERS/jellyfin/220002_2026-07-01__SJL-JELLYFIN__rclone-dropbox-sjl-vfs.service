@@ -1,0 +1,36 @@
+# =============================================================================
+# 220002 SJL JELLYFIN — rclone VFS Mount: Dropbox SJL
+# Systemd service — install to /etc/systemd/system/
+# Requires: rclone config at /etc/rclone/rclone.conf (root-owned, 600)
+#           fuse3 package, /mnt/sjl-cloud/dropbox-sjl mount point
+# =============================================================================
+[Unit]
+Description=SJL rclone VFS — Dropbox SJL
+Documentation=https://rclone.org/commands/rclone_mount/
+After=network-online.target
+Wants=network-online.target
+AssertPathIsDirectory=/mnt/sjl-cloud/dropbox-sjl
+
+[Service]
+Type=notify
+User=root
+ExecStartPre=/bin/mkdir -p /mnt/sjl-cloud/dropbox-sjl
+ExecStartPre=/bin/mkdir -p /var/log/rclone
+ExecStart=/usr/bin/rclone mount dropbox-sjl: /mnt/sjl-cloud/dropbox-sjl \
+    --config /etc/rclone/rclone.conf \
+    --allow-other \
+    --dir-cache-time 24h \
+    --vfs-cache-mode writes \
+    --vfs-cache-max-size 5G \
+    --buffer-size 128M \
+    --poll-interval 60s \
+    --log-level INFO \
+    --log-file /var/log/rclone/220002-dropbox-sjl-vfs.log
+ExecStop=/bin/fusermount3 -uz /mnt/sjl-cloud/dropbox-sjl
+Restart=on-failure
+RestartSec=10
+TimeoutStartSec=60
+KillMode=process
+
+[Install]
+WantedBy=multi-user.target

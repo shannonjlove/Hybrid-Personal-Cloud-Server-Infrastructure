@@ -1,0 +1,39 @@
+# =============================================================================
+# 220000 SJL JELLYFIN — rclone VFS Mount: IDrive E2 Primary
+# Systemd service — install to /etc/systemd/system/
+# Requires: rclone config at /etc/rclone/rclone.conf (root-owned, 600)
+#           fuse3 package, /mnt/sjl-cloud/idrive-primary mount point
+# =============================================================================
+[Unit]
+Description=SJL rclone VFS — IDrive E2 Primary
+Documentation=https://rclone.org/commands/rclone_mount/
+After=network-online.target
+Wants=network-online.target
+AssertPathIsDirectory=/mnt/sjl-cloud/idrive-primary
+
+[Service]
+Type=notify
+User=root
+ExecStartPre=/bin/mkdir -p /mnt/sjl-cloud/idrive-primary
+ExecStartPre=/bin/mkdir -p /var/log/rclone
+ExecStart=/usr/bin/rclone mount idrive-primary: /mnt/sjl-cloud/idrive-primary \
+    --config /etc/rclone/rclone.conf \
+    --allow-other \
+    --dir-cache-time 72h \
+    --vfs-cache-mode full \
+    --vfs-cache-max-size 20G \
+    --vfs-cache-max-age 24h \
+    --vfs-read-chunk-size 128M \
+    --vfs-read-chunk-size-limit 2G \
+    --buffer-size 256M \
+    --poll-interval 15s \
+    --log-level INFO \
+    --log-file /var/log/rclone/220000-idrive-primary-vfs.log
+ExecStop=/bin/fusermount3 -uz /mnt/sjl-cloud/idrive-primary
+Restart=on-failure
+RestartSec=10
+TimeoutStartSec=60
+KillMode=process
+
+[Install]
+WantedBy=multi-user.target
