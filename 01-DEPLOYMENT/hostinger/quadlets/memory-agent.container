@@ -1,0 +1,19 @@
+[Unit]
+Description=SJL Memory Agent (Claude memory-tool service)
+After=network-online.target
+
+[Container]
+Image=localhost/memory-agent:latest
+ContainerName=memory-agent
+PublishPort=100.115.66.75:8100:8000
+Volume=/mnt/shared-context/memory-agent:/memories:Z
+Secret=anthropic_api_key,type=env,target=ANTHROPIC_API_KEY
+Environment=ANTHROPIC_MODEL=claude-sonnet-4-6
+Environment=MEMORY_BASE_PATH=/memories
+
+[Service]
+Restart=on-failure
+TimeoutStartSec=60
+
+[Install]
+WantedBy=multi-user.target

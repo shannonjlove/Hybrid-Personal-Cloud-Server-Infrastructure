@@ -1,0 +1,22 @@
+[Unit]
+Description=WebTop — always-on desktop environment (sOs)
+After=network-online.target
+
+[Container]
+Image=lscr.io/linuxserver/webtop:ubuntu-xfce
+ContainerName=webtop
+# PublishPort lines use sOs Tailscale IP (100.67.229.94) — written by deploy script
+PublishPort=100.67.229.94:3000:3000
+PublishPort=100.67.229.94:3001:3001
+Volume=/opt/webtop/config:/config:Z
+Volume=/mnt/shared-context:/mnt/shared-context:Z
+Environment=PUID=1000
+Environment=PGID=1000
+Environment=TZ=America/New_York
+
+[Service]
+Restart=always
+TimeoutStartSec=120
+
+[Install]
+WantedBy=multi-user.target
