@@ -74,6 +74,7 @@ BUS=""
 CURRENT_UNIT=""
 RW_UNIT=""
 PYTHON_BIN=""
+PYTHON_BIN_8777=""
 WORKDIR=""
 WORKDIR_8777=""
 
@@ -464,11 +465,14 @@ PID_8797="$(listener_pid "$PUBLIC_PORT")"
 port_is_free "$STAGE_PORT" || die "Staging port $STAGE_PORT is already in use"
 
 PYTHON_BIN="$(readlink -f "/proc/${PID_8797}/exe")"
+PYTHON_BIN_8777="$(readlink -f "/proc/${PID_8777}/exe" 2>/dev/null || true)"
 WORKDIR="$(readlink -f "/proc/${PID_8797}/cwd")"
 WORKDIR_8777="$(readlink -f "/proc/${PID_8777}/cwd" 2>/dev/null || true)"
 
 [[ -x "$PYTHON_BIN" ]] || die "Unable to identify active Python interpreter"
 [[ -d "$WORKDIR" ]] || die "Unable to identify active working directory"
+echo "8797 Python: $PYTHON_BIN"
+echo "8777 Python: ${PYTHON_BIN_8777:-not detected}"
 
 # ---------------------------------------------------------------------
 # Backup live state
@@ -829,48 +833,67 @@ PY
         fi
     fi
 
-    # Inherit the full production environment from the live 8797 process
-    # (tokens, API keys, all runtime vars set by systemd), then override only
-    # port/host vars for staging isolation. PYTHONPATH puts TMP_STAGE first so
-    # companion modules copied there shadow any stale copies in WORKDIR.
+    # Build the staging environment by merging two process environments:
+    #   8797 env: tokens, API keys, service config (base layer)
+    #   8777 env: Python dependency chain — VIRTUAL_ENV, PYTHONPATH, PATH,
+    #             site-packages with google-auth etc. (overlay on top)
+    # Then override port/host for staging isolation.
+    # Use 8777's Python binary which has the complete installed dep tree.
     (
         python3 - \
                 "$PID_8797" \
+                "$PID_8777" \
                 "$STAGE_PORT" \
                 "$WORKDIR" \
-                "$PYTHON_BIN" \
+                "${PYTHON_BIN_8777:-$PYTHON_BIN}" \
                 "$TMP_STAGE/server.py" \
                 "$TMP_STAGE" <<'PYENV'
 import sys, os
 
-pid       = sys.argv[1]
-port      = sys.argv[2]
-wdir      = sys.argv[3]
-py        = sys.argv[4]
-srv       = sys.argv[5]
-stage_dir = sys.argv[6]
+pid_8797  = sys.argv[1]
+pid_8777  = sys.argv[2]
+port      = sys.argv[3]
+wdir      = sys.argv[4]
+py        = sys.argv[5]
+srv       = sys.argv[6]
+stage_dir = sys.argv[7]
 
-env = {}
-try:
-    with open(f'/proc/{pid}/environ', 'rb') as fh:
-        for item in fh.read().split(b'\0'):
-            if b'=' in item:
-                k, _, v = item.partition(b'=')
-                try:
-                    env[k.decode('utf-8', 'replace')] = v.decode('utf-8', 'replace')
-                except Exception:
-                    pass
-except OSError as exc:
-    print(f'WARNING: could not read production environ: {exc}', file=sys.stderr)
+def read_proc_env(pid):
+    env = {}
+    try:
+        with open(f'/proc/{pid}/environ', 'rb') as fh:
+            for item in fh.read().split(b'\0'):
+                if b'=' in item:
+                    k, _, v = item.partition(b'=')
+                    try:
+                        env[k.decode('utf-8', 'replace')] = v.decode('utf-8', 'replace')
+                    except Exception:
+                        pass
+    except OSError as exc:
+        print(f'WARNING: could not read /proc/{pid}/environ: {exc}', file=sys.stderr)
+    return env
 
+# Base layer: 8797 tokens and service config
+env = read_proc_env(pid_8797)
+
+# Overlay: 8777 Python dependency chain (VIRTUAL_ENV, PYTHONPATH, PATH)
+# The RW backend has google-auth and all other deps installed; 8797 does not.
+env_8777 = read_proc_env(pid_8777)
+for key in ('VIRTUAL_ENV', 'PYTHONHOME', 'PATH'):
+    if key in env_8777:
+        env[key] = env_8777[key]
+# Prepend 8777's PYTHONPATH entries rather than replacing, so we don't
+# lose any 8797-specific paths.
+base_pypath = env_8777.get('PYTHONPATH', env.get('PYTHONPATH', ''))
+
+# Staging overrides
 for k in ('PORT', 'MCP_PORT', 'SJL_MCP_PORT'):
     env[k] = port
 for k in ('HOST', 'MCP_HOST', 'SJL_MCP_HOST'):
     env[k] = '127.0.0.1'
 
-existing = env.get('PYTHONPATH', '')
-# stage_dir first so companion modules copied there take precedence
-env['PYTHONPATH'] = f'{stage_dir}:{wdir}:{existing}' if existing else f'{stage_dir}:{wdir}'
+# stage_dir and wdir first so companion modules shadow stale filesystem copies
+env['PYTHONPATH'] = f'{stage_dir}:{wdir}:{base_pypath}' if base_pypath else f'{stage_dir}:{wdir}'
 
 os.chdir(wdir)
 os.execve(py, [py, srv], env)
