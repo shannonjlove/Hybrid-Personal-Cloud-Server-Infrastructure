@@ -18,17 +18,16 @@ All nodes connected via **Tailscale** mesh VPN. All services under `*.shannonjlo
 2. **Nginx Proxy Manager only.** NPM handles all reverse proxy + SSL. Never Traefik, never Caddy. Delete any `traefik.*` labels on sight.
 3. **No `ai-memory` binary.** Do not install `alphaonedev/ai-memory-mcp` — unverified, pulled via `curl | sh`, out of scope permanently.
 4. **No secrets in the repo.** `.env` is gitignored. `env.template` (no leading dot) committed with placeholders only.
+5. **No Anthropic API key required.** The memory stack is fully local — no external API calls.
 
 ## Architecture
 
 ```
 Nexus (100.115.66.75, public 72.61.74.250)
-  ├── memory-agent   FastAPI + BetaLocalFilesystemMemoryTool, Tailscale-bound port 8100
-  │                  Storage: /mnt/shared-context/memory-agent/
-  ├── /opt/shared-context  → bind-mounted to /mnt/shared-context → exported via NFS
+  ├── /opt/shared-context  -> bind-mounted to /mnt/shared-context -> exported via NFS
   │                           (Tailscale subnet 100.64.0.0/10 ONLY)
   ├── claude-memory  stdio MCP server (no container), MEMORY_ROOT=/mnt/shared-context/claude-memories
-  └── NPM            https://memory.shannonjlove.cloud → 100.115.66.75:8100
+  └── NPM            Reverse proxy + SSL for all public services
 
 sOs (100.67.229.94)
   ├── /mnt/shared-context  NFS-mounted from Nexus, same absolute path
@@ -37,33 +36,22 @@ sOs (100.67.229.94)
                      Always-on. Bind-mounts /mnt/shared-context at same path inside container.
 ```
 
-## Memory tools (active on all nodes)
+## Memory tool — claude-memory (free, no API key)
 
-### 1. memory-agent (Nexus only — HTTP API)
-- FastAPI service wrapping Anthropic `BetaLocalFilesystemMemoryTool`
-- Podman Quadlet bound to `100.115.66.75:8100` (Tailscale-only)
-- Anthropic API key stored as Podman secret `anthropic_api_key` (never on disk in plaintext)
-- Public at `https://memory.shannonjlove.cloud` (NPM proxy)
-- Health: `GET /healthz` | Chat: `POST /chat {"message": "...", "session_id": "..."}`
-
-### 2. claude-memory (Anthropic memory_20250818 protocol)
 - stdio MCP server at `~/.local/lib/claude-memory/server.py`
-- **MEMORY_ROOT = `/mnt/shared-context/claude-memories`** (shared NFS — same files on all nodes)
+- Implements the Anthropic `memory_20250818` protocol (view/create/edit/delete file ops)
+- **MEMORY_ROOT = `/mnt/shared-context/claude-memories`** (shared via NFS — same files on all nodes)
 - **Always `view /memories` at the start of every session** to recover prior context
-- This is a SHARED store — context written on Nexus is readable on sOs, in WebTop, etc.
+- Zero API calls — Claude Code itself decides what to remember, the server just does file I/O
 
-## Deployment scripts
-
-All scripts in `scripts/` — run on the host specified in the filename:
+## Deployment (two commands total)
 
 ```bash
-# Nexus only (run in order):
-bash scripts/deploy-memory-agent-nexus.sh        # Step 0: FastAPI memory-agent
-bash scripts/deploy-shared-context-nexus.sh      # Step 1: NFS export + claude-memory
-bash scripts/configure-npm-memory.sh             # Step 3: NPM proxy host
+# On Nexus:
+bash scripts/deploy-shared-context-nexus.sh
 
-# sOs (after Nexus Steps 0-1 complete):
-bash scripts/deploy-shared-context-sos-webtop.sh # Step 2: NFS mount + WebTop
+# On sOs (after Nexus finishes):
+bash scripts/deploy-shared-context-sos-webtop.sh
 ```
 
 ## Key directories
@@ -72,11 +60,12 @@ bash scripts/deploy-shared-context-sos-webtop.sh # Step 2: NFS mount + WebTop
 02-CONTAINERS/ai-mcp-servers/
   claude-memory/server.py          <- Anthropic memory_20250818 stdio MCP server
   claude-memory/seed-memories/     <- infrastructure-rules.md seeded to MEMORY_ROOT on install
-01-DEPLOYMENT/hostinger/quadlets/  <- Nexus quadlet unit files
-01-DEPLOYMENT/oracle/quadlets/     <- sOs quadlet unit files (includes webtop)
-scripts/                           <- Deployment scripts (see above)
+01-DEPLOYMENT/oracle/quadlets/     <- sOs quadlet unit files (webtop)
+scripts/
+  deploy-shared-context-nexus.sh   <- Nexus: NFS export + claude-memory install
+  deploy-shared-context-sos-webtop.sh <- sOs: NFS mount + WebTop Quadlet
 ios/scriptable/                    <- iPhone Scriptable JS files
-.claude/settings.json              <- Claude Code MCP config (written by deploy scripts)
+.claude/settings.json              <- Claude Code MCP config
 ```
 
 ## NPM access
