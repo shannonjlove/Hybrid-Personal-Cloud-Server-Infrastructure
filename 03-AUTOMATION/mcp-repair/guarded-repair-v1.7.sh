@@ -3,13 +3,25 @@ set -Eeuo pipefail
 umask 077
 
 # =====================================================================
-# SJL MCP Guarded Repair v1.7
+# SJL MCP Guarded Repair v1.9
 #
 # Purpose:
 #   Recover the write-enabled public MCP gateway on 8797 by locating,
 #   ranking, staging, live-validating, and atomically promoting a known-good
-#   historical server.py candidate while preserving the healthy guarded
-#   backend on 8777.
+#   historical server.py candidate (plus companion modules) while preserving
+#   the healthy guarded backend on 8777.
+#
+# v1.9 additions over v1.7:
+#   - Companion module recovery: discovers gcp_tools.py (or gcp_tools/)
+#     from the healthy 8777 working directory, the filesystem, or git history.
+#   - Full staging tree: copies companion modules into the temp staging
+#     directory so server.py can import them during live validation.
+#   - Full promotion: installs companion modules to WORKDIR alongside the
+#     promoted server.py so the service can restart cleanly.
+#   - Companion rollback: removes any newly-installed companion file if
+#     post-promotion validation fails.
+#   - Production environment inheritance: reads /proc/$PID_8797/environ so
+#     tokens, API keys, and all runtime vars are present during staging.
 #
 # Core guarantees:
 #   - No mutation before complete backup and live preflight validation.
@@ -63,6 +75,12 @@ CURRENT_UNIT=""
 RW_UNIT=""
 PYTHON_BIN=""
 WORKDIR=""
+WORKDIR_8777=""
+
+# Companion module state (gcp_tools.py or gcp_tools/ package)
+GTOOLS_COMPANION=""   # source path of the companion module to stage/promote
+GTOOLS_IS_PKG=0      # 1 if gcp_tools is a directory package, 0 if a .py file
+COMPANION_DEST=""     # destination path in WORKDIR after promotion (for rollback)
 
 declare -A SEEN_CANDIDATES=()
 
@@ -356,6 +374,14 @@ rollback() {
         install -D -m 0644 "$BACKUP_ROOT/sjl-cloud-access-mcp.service" "$CURRENT_UNIT" || true
         chown "$SJL_USER:$SJL_USER" "$CURRENT_SOURCE" "$CURRENT_UNIT" || true
 
+        # Remove any companion module that was newly installed during promotion.
+        # The original app/ dir did not have gcp_tools, so we must not leave a
+        # stray copy that could confuse the restored read-only server.py.
+        if [[ -n "${COMPANION_DEST:-}" ]]; then
+            rm -rf "$COMPANION_DEST" 2>/dev/null || true
+            echo "Companion module removed from WORKDIR: $COMPANION_DEST"
+        fi
+
         sjl_systemctl daemon-reload || true
         sjl_systemctl restart sjl-cloud-access-mcp.service || true
         sjl_systemctl status sjl-cloud-access-mcp.service --no-pager || true
@@ -439,6 +465,7 @@ port_is_free "$STAGE_PORT" || die "Staging port $STAGE_PORT is already in use"
 
 PYTHON_BIN="$(readlink -f "/proc/${PID_8797}/exe")"
 WORKDIR="$(readlink -f "/proc/${PID_8797}/cwd")"
+WORKDIR_8777="$(readlink -f "/proc/${PID_8777}/cwd" 2>/dev/null || true)"
 
 [[ -x "$PYTHON_BIN" ]] || die "Unable to identify active Python interpreter"
 [[ -d "$WORKDIR" ]] || die "Unable to identify active working directory"
@@ -475,6 +502,78 @@ PRE_8777="$(query_tools "$RW_PORT" "$BACKUP_ROOT/8777-tools-before.json")"
 PRE_8797="$(query_tools "$PUBLIC_PORT" "$BACKUP_ROOT/8797-tools-before.json")"
 
 (( PRE_8777 > 0 )) || die "$RW_PORT did not return tools"
+
+# ---------------------------------------------------------------------
+# Locate companion modules (gcp_tools)
+# ---------------------------------------------------------------------
+# The write-enabled server.py imports gcp_tools, but WORKDIR (8797's app dir)
+# may no longer contain it after a partial deployment stripped the tree.
+# Search in priority order: 8777 workdir (healthy process), filesystem, git.
+say "Locate companion modules"
+
+_find_gtools() {
+    local p="$1"
+    if [[ -f "${p}/gcp_tools.py" ]]; then
+        GTOOLS_COMPANION="${p}/gcp_tools.py"
+        GTOOLS_IS_PKG=0
+        return 0
+    elif [[ -d "${p}/gcp_tools" && -f "${p}/gcp_tools/__init__.py" ]]; then
+        GTOOLS_COMPANION="${p}/gcp_tools"
+        GTOOLS_IS_PKG=1
+        return 0
+    fi
+    return 1
+}
+
+_find_gtools "$WORKDIR_8777" \
+    || _find_gtools "$WORKDIR" \
+    || true
+
+if [[ -z "$GTOOLS_COMPANION" ]]; then
+    while IFS= read -r found; do
+        [[ -n "$found" ]] || continue
+        GTOOLS_COMPANION="$found"
+        GTOOLS_IS_PKG=0
+        break
+    done < <(
+        find /srv/sjl /home/sjl /opt /root/backups \
+            -xdev -not -path "*/.git/*" \
+            \( -name "gcp_tools.py" -o \( -type d -name "gcp_tools" \) \) \
+            2>/dev/null
+    )
+fi
+
+if [[ -z "$GTOOLS_COMPANION" ]] && have git; then
+    echo "Companion not on filesystem; searching git history..."
+    mkdir -p "$CANDIDATE_DIR/companion"
+    while IFS= read -r -d '' gitdir; do
+        repo="${gitdir%/.git}"
+        while IFS= read -r sha; do
+            [[ -n "$sha" ]] || continue
+            dest="$CANDIDATE_DIR/companion/gcp_tools-${sha}.py"
+            if git -C "$repo" cat-file blob "$sha" > "$dest" 2>/dev/null; then
+                GTOOLS_COMPANION="$dest"
+                GTOOLS_IS_PKG=0
+                echo "Companion module recovered from git ($repo $sha)"
+                break 2
+            fi
+            rm -f "$dest"
+        done < <(
+            git -C "$repo" rev-list --all --objects 2>/dev/null |
+                awk '$2 ~ /(^|\/)gcp_tools\.py$/ {print $1}' | head -5
+        )
+    done < <(
+        find /srv/sjl /root/backups /home/sjl /opt \
+            -xdev -type d -name .git -print0 2>/dev/null
+    )
+fi
+
+if [[ -n "$GTOOLS_COMPANION" ]]; then
+    echo "Companion module: $GTOOLS_COMPANION (is_pkg=${GTOOLS_IS_PKG})"
+    cp -a "$GTOOLS_COMPANION" "$BACKUP_ROOT/"
+else
+    echo "WARNING: gcp_tools companion module not found; staging will fail if server.py imports it."
+fi
 
 # ---------------------------------------------------------------------
 # Collect filesystem candidates
@@ -720,24 +819,36 @@ PY
     TMP_STAGE="$(mktemp -d /var/tmp/sjl-mcp-stage.XXXXXX)"
     cp -a "$candidate" "$TMP_STAGE/server.py"
 
+    # Copy companion modules (gcp_tools) into the staging tree so server.py
+    # can import them from TMP_STAGE, even if WORKDIR no longer has them.
+    if [[ -n "$GTOOLS_COMPANION" ]]; then
+        if (( GTOOLS_IS_PKG == 1 )); then
+            cp -a "$GTOOLS_COMPANION" "$TMP_STAGE/"
+        else
+            cp -a "$GTOOLS_COMPANION" "$TMP_STAGE/gcp_tools.py"
+        fi
+    fi
+
     # Inherit the full production environment from the live 8797 process
     # (tokens, API keys, all runtime vars set by systemd), then override only
-    # port/host vars for staging isolation. PYTHONPATH includes WORKDIR so
-    # local sibling modules (e.g. gcp_tools) are importable from the temp dir.
+    # port/host vars for staging isolation. PYTHONPATH puts TMP_STAGE first so
+    # companion modules copied there shadow any stale copies in WORKDIR.
     (
         python3 - \
                 "$PID_8797" \
                 "$STAGE_PORT" \
                 "$WORKDIR" \
                 "$PYTHON_BIN" \
-                "$TMP_STAGE/server.py" <<'PYENV'
+                "$TMP_STAGE/server.py" \
+                "$TMP_STAGE" <<'PYENV'
 import sys, os
 
-pid  = sys.argv[1]
-port = sys.argv[2]
-wdir = sys.argv[3]
-py   = sys.argv[4]
-srv  = sys.argv[5]
+pid       = sys.argv[1]
+port      = sys.argv[2]
+wdir      = sys.argv[3]
+py        = sys.argv[4]
+srv       = sys.argv[5]
+stage_dir = sys.argv[6]
 
 env = {}
 try:
@@ -758,7 +869,8 @@ for k in ('HOST', 'MCP_HOST', 'SJL_MCP_HOST'):
     env[k] = '127.0.0.1'
 
 existing = env.get('PYTHONPATH', '')
-env['PYTHONPATH'] = f'{wdir}:{existing}' if existing else wdir
+# stage_dir first so companion modules copied there take precedence
+env['PYTHONPATH'] = f'{stage_dir}:{wdir}:{existing}' if existing else f'{stage_dir}:{wdir}'
 
 os.chdir(wdir)
 os.execve(py, [py, srv], env)
@@ -853,6 +965,20 @@ PROMOTION_TEMP="${CURRENT_SOURCE}.new.${STAMP}"
 install -m 0644 "$SELECTED_PATH" "$PROMOTION_TEMP"
 chown "$SJL_USER:$SJL_USER" "$PROMOTION_TEMP"
 
+# Install companion module (gcp_tools) to WORKDIR before service restart.
+# This restores the full source tree so the promoted server.py can import it.
+if [[ -n "$GTOOLS_COMPANION" ]]; then
+    APP_DIR="$(dirname "$CURRENT_SOURCE")"
+    if (( GTOOLS_IS_PKG == 1 )); then
+        COMPANION_DEST="${APP_DIR}/gcp_tools"
+    else
+        COMPANION_DEST="${APP_DIR}/gcp_tools.py"
+    fi
+    cp -a "$GTOOLS_COMPANION" "$COMPANION_DEST"
+    chown -R "$SJL_USER:$SJL_USER" "$COMPANION_DEST"
+    echo "Companion module installed: $COMPANION_DEST"
+fi
+
 MUTATED=1
 mv -f "$PROMOTION_TEMP" "$CURRENT_SOURCE"
 
@@ -941,7 +1067,7 @@ sjl_systemctl status sjl-unified-cloud-mcp-rw.service --no-pager \
     > "$BACKUP_ROOT/rw-status-after.txt"
 
 cat > "$REPORT" <<EOF
-# SJL MCP Guarded Repair v1.7 Report
+# SJL MCP Guarded Repair v1.9 Report
 
 - Timestamp: ${STAMP}
 - Host: $(hostname -f 2>/dev/null || hostname)
@@ -949,6 +1075,8 @@ cat > "$REPORT" <<EOF
 - Selected candidate SHA-256: ${SELECTED_SHA}
 - Candidate score: ${SELECTED_SCORE}
 - Staging tool count: ${SELECTED_STAGE_TOOLS}
+- Companion module source: ${GTOOLS_COMPANION:-none}
+- Companion module dest: ${COMPANION_DEST:-n/a}
 - Pre-repair 8777 tools: ${PRE_8777}
 - Pre-repair 8797 tools: ${PRE_8797}
 - Post-repair 8777 tools: ${POST_8777}

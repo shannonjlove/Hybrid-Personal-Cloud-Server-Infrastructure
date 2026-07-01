@@ -1,7 +1,7 @@
 # Runbook: MCP Write Access Recovery (Hostinger VPS)
 
 **Applies to:** `sjl-cloud-access-mcp.service` (port `8797`) on `shannonjlove.cloud`
-**Script:** `03-AUTOMATION/mcp-repair/guarded-repair-v1.7.sh`
+**Script:** `03-AUTOMATION/mcp-repair/guarded-repair-v1.7.sh` (internal version: v1.9)
 **Symptom:** Public MCP endpoint reports `readonly=true` or exposes fewer than 23 tools.
 
 ---
@@ -56,7 +56,7 @@ bash -n /path/to/guarded-repair-v1.7.sh && echo "Syntax OK"
 
 # 8. Verify script SHA-256 matches expected value
 sha256sum /path/to/guarded-repair-v1.7.sh
-# Expected: a8b404c013d8fc8ed2147622d7ff6ed2f413281ea83012b94948c897474c6509
+# Expected: 9e5a6c111d88c0390cfed2fcd9f222f5f95b29898285b4f282d742b933d7fb43
 ```
 
 **Abort if:**
