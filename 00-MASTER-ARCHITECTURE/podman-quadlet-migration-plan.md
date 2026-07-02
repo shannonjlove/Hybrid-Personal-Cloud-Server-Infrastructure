@@ -41,6 +41,51 @@ go-ahead per host).
 > proceeded with the recommended defaults so this plan isn't blocked — say so in a
 > normal reply (not the question tool) if you'd choose differently and I'll revise.
 
+## Legacy Desktop / GUI Tooling (WebTopSJL) — feasibility flagged, not yet built
+
+You asked to add ABBYY FineReader for OCR, use your NeoFinder license (Mac media
+cataloging software) against our cloud services, and install DeltaWalker v4 (Unix),
+proposing a "WebTopSJL" desktop environment to host them. Three different feasibility
+profiles here — flagging before building anything so the plan doesn't quietly assume
+something that can't actually run:
+
+| Tool | Platform reality | Verdict |
+|---|---|---|
+| **DeltaWalker v4** | Deltopia ships native Linux builds (deb/rpm/tar.gz) alongside Windows/Mac. | **Feasible.** GUI app, so it still needs a display — see WebTopSJL below — but the binary itself runs natively on Linux, no emulation needed. |
+| **ABBYY FineReader** | The desktop "FineReader PDF" product is Windows/Mac only — no Linux build. ABBYY does sell a separate Linux-targeted **server/SDK** product (FlexiCapture/FineReader Engine) for automated pipelines, but that's a different product and license from a desktop reader seat. | **Depends on which license you hold** — see question below. If it's the desktop app, it can't be wired into the headless Podman pipeline; it would stay a manual, interactive tool. |
+| **NeoFinder** | Mac-only. No Windows or Linux version has ever existed. It catalogs locally-mounted volumes (drives, network shares) with thumbnails/metadata — it has no concept of "cloud services" directly, only whatever's mounted as a filesystem. | **Not containerizable on this Linux infrastructure.** Running it would require an actual macOS environment (real Apple hardware, or a Mac-hosting provider like MacStadium — Apple's EULA blocks virtualizing macOS on non-Apple hardware). This is a fundamentally different infra track than Podman Quadlets on Nexus/sOs. |
+
+**What "WebTopSJL" would be, if we build it:** a Podman Quadlet running
+`linuxserver/webtop` — a full Linux desktop (XFCE/KDE) rendered in-browser via
+KasmVNC, deployed like any other service (its own `.container`/`.volume` units,
+full `sjl.*` label set, `sjl.exposure=private`/Tailscale-only since it's an admin
+tool, not public). DeltaWalker v4 installs cleanly inside it as a normal Linux
+package. This becomes a real Phase 3 addition once confirmed.
+
+**What it can't be, no matter how it's packaged:** a place to run NeoFinder or
+(desktop) ABBYY FineReader, since a Linux desktop container still only runs Linux
+binaries — it's not emulation or virtualization of macOS/Windows.
+
+**Two things I need from you before I write the WebTopSJL units and DeltaWalker
+Quadlet:**
+1. Which ABBYY product/license do you actually hold — the desktop FineReader
+   (Mac or Windows), or a server/SDK product? That determines whether it joins the
+   automated OCR pipeline (Phase 3, alongside Paperless-ngx) or stays a manual tool
+   run on your own machine.
+2. For NeoFinder's actual goal (media tagging/metadata for cloud-stored files) —
+   do you want to keep running NeoFinder locally on your Mac against
+   rclone-mounted cloud storage (which works today, no infra change needed), or
+   is the metadata-cataloging goal already covered by PhotoPrism (Phase 3) for
+   photos/video and Paperless-ngx for documents, making a NeoFinder-equivalent
+   on the Linux side unnecessary?
+
+**Also, a standing limitation worth restating:** this session only has access to
+this git repository's checkout — not SSH/terminal access to Nexus, sOs, or any
+other live host. I can author the Quadlet units, install scripts, and docs (the
+same as everything else in this plan), but the actual `podman` commands need to
+run *on* the target host, either by you, or by me in a session with real access to
+that machine.
+
 ## Container & File Tagging Convention (expanded)
 
 The user asked for a **tagging convention**, not just a naming convention — and for
@@ -182,7 +227,8 @@ in `mcp-cloud-suite.tar` (5 MCP-server `.container` units + `deploy-cloud-mcp-su
   `02-CONTAINERS/SERVICE-INVENTORY.md`. Services identified so far: Traefik (→ retired),
   BookStack (+ DB), PhotoPrism, Stash, Hookmark-sync, AI-MCP-servers (5 sub-services),
   **Paperless-ngx (new — OCR/tagging)**, **Nominatim (new — self-hosted reverse
-  geocoding, see EXIF/Geolocation subsection above)**.
+  geocoding, see EXIF/Geolocation subsection above)**, **WebTopSJL (new — pending
+  your answers in the Legacy Desktop Tooling section above; hosts DeltaWalker v4)**.
 - Confirm with you: any services running live on Nexus/sOs *right now* that aren't
   reflected in this repo yet (the repo currently looks pre-deployment/planning-stage
   for most services except the MCP suite).
@@ -213,6 +259,14 @@ sub-services, **Paperless-ngx**), using the existing MCP-suite units as the temp
 - Add `02-CONTAINERS/nominatim/` as a new, private-only (`sjl.exposure=private`)
   reverse-geocoding service feeding the EXIF/address pipeline — a self-contained
   OSM-data container, no external API calls, no data leaves your infrastructure.
+- **Once the two questions in "Legacy Desktop / GUI Tooling" above are answered**:
+  add `02-CONTAINERS/webtop-sjl/` (`linuxserver/webtop` Quadlet, `sjl.exposure=private`)
+  with DeltaWalker v4 installed inside it. ABBYY FineReader joins the OCR pipeline
+  here only if it turns out to be a Linux-capable server/SDK product; otherwise it's
+  documented as a manual tool, not part of the automated Quadlet services. NeoFinder
+  is out of scope for this repo's services list regardless of the answer, since it
+  cannot run on Linux — at most, this repo documents how it stays part of your
+  Mac-side workflow against rclone-mounted cloud storage.
 - Replace root `docker-compose.yml` service-by-service until it can be deleted.
 - Each service's `README.md` "Files (Planned)" section gets replaced with the real,
   committed Quadlet units (closes out the current stub state).
