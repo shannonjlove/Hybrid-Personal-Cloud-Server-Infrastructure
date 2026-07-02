@@ -156,18 +156,32 @@ human-authored text:
 Every photo and video, wherever it lands in the system, must have its **full embedded
 metadata preserved and surfaced**, not just PhotoPrism's derived content tags:
 
+- **Extraction engine: [ExifTool](https://exiftool.org/)** (Phil Harvey) — the actual
+  named tool for this step, filling a gap this plan previously left implicit. It's
+  open-source, cross-platform (native Linux package: `libimage-exiftool-perl`), and
+  reads/writes EXIF/IPTC/XMP/MakerNotes across hundreds of formats — the most
+  exhaustive option available and more thorough than PhotoPrism's own built-in
+  parsing, which only surfaces a subset. Verified working (v12.76) via
+  `apt install libimage-exiftool-perl` on Ubuntu 24.04, matching the Debian-based
+  images `linuxserver/webtop` and most Quadlet base images already use.
 - Full EXIF (camera, lens, exposure, timestamp, orientation) + IPTC/XMP where present,
-  extracted in full into the sidecar under an `exif:` block — not a curated subset.
-- **GPS is reverse-geocoded, not left as raw coordinates.** The sidecar carries both
-  the original `gps_lat`/`gps_lon` (never discarded — it's the ground truth) **and** a
-  resolved `address:` block (`street`, `city`, `region`, `postal_code`, `country`) via
-  the reverse-geocoding provider from the Key Decisions table above.
-- This extraction runs through PhotoPrism where possible (it already parses EXIF/GPS
-  natively); the reverse-geocoding-to-address step is the one addition needed on top,
-  since PhotoPrism itself only exposes coordinates/place names, not full addresses.
+  extracted in full into the sidecar under an `exif:` block via `exiftool -json`
+  (structured, scriptable output) — not a curated subset.
+- **GPS is reverse-geocoded, not left as raw coordinates.** ExifTool extracts the raw
+  `GPSLatitude`/`GPSLongitude` (never discarded — it's the ground truth); the sidecar
+  also carries a resolved `address:` block (`street`, `city`, `region`, `postal_code`,
+  `country`) via the Nominatim reverse-geocoding provider from the Key Decisions table.
+- Division of labor: **ExifTool owns raw technical/embedded metadata extraction**;
+  **PhotoPrism owns content-based tagging** (objects, scenes, faces) that ExifTool
+  can't do; **Nominatim owns coordinate-to-address resolution**. All three feed the
+  same per-file sidecar, so no tool is asked to do a job outside what it's built for.
+- Runs as a small tagging-pipeline utility (Phase 5 automation script calling
+  `exiftool`), not as its own always-on Quadlet service — it's a CLI tool invoked
+  per file, so it just needs to be installed inside whichever container/host runs
+  the `03-AUTOMATION/auto-tagging/` pipeline.
 - Non-photo/video files carry whatever embedded metadata their format supports
-  (PDF `/Info` + XMP, audio ID3, etc.) into the same sidecar shape for consistency,
-  even though most won't have GPS data.
+  (PDF `/Info` + XMP, audio ID3, etc.) — ExifTool reads all of these too — into the
+  same sidecar shape for consistency, even though most won't have GPS data.
 
 ### GCP Vision / Video Intelligence enrichment (future — Phase 8, gated on the GCP VM)
 
@@ -301,14 +315,16 @@ sub-services, **Paperless-ngx**), using the existing MCP-suite units as the temp
 - File everything into the correct `00-06` directory — nothing stays loose at repo root
   except `README.md` itself.
 - **Run every existing binary/opaque file through OCR once** (Paperless-ngx for the
-  5 MCP PDFs + `README.pdf`; PhotoPrism + Nominatim reverse-geocoding for any
-  images/video added later) to backfill `<filename>.meta.yaml` sidecars — this is
+  5 MCP PDFs + `README.pdf`; PhotoPrism + ExifTool + Nominatim reverse-geocoding for
+  any images/video added later) to backfill `<filename>.meta.yaml` sidecars — this is
   the one-time catch-up pass; going forward new files get tagged at ingestion, not
   retroactively.
 - Wire PhotoPrism's content tags directly into the Hazel renaming step so filenames
   are content-derived (see the "PhotoPrism as primary tagging engine" note above),
-  and wire Nominatim into the same pipeline so every photo/video sidecar gets a
-  resolved address, not just coordinates.
+  run **ExifTool** (`exiftool -json`) for the full embedded-metadata block, and wire
+  Nominatim into the same pipeline so every photo/video sidecar gets a resolved
+  address, not just coordinates. Install target: `libimage-exiftool-perl` (verified
+  working, v12.76, on the Debian/Ubuntu base most Quadlet images already use).
 - Add YAML frontmatter (`para_category`, `description`, `uuid24`, `created`,
   `related_service`, `sensitivity`) to every text/config/doc file that doesn't have it.
 - Tag every Quadlet unit with the full `sjl.*` label set from the Tagging Convention
