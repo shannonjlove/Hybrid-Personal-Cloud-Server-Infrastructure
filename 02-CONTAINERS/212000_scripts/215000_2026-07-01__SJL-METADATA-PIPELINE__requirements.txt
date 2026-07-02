@@ -1,0 +1,24 @@
+# 215000 SJL Metadata Pipeline — Python dependencies
+# Install: pip install -r 215000_...requirements.txt
+
+# File type detection & metadata
+mutagen>=1.47          # audio tag reading/writing (MP3, FLAC, M4A, OGG, etc.)
+python-magic>=0.4.27   # libmagic MIME detection
+exifread>=3.0.0        # image EXIF (faster than shelling out for images)
+pillow>=10.0.0         # image handling for thumbnail generation
+
+# Audio BPM analysis
+aubio>=0.4.9           # fast BPM + onset detection (C library, much faster than librosa)
+# librosa>=0.10.0      # alternative if aubio unavailable (slower, pure Python)
+numpy>=1.24.0          # required by aubio/librosa
+
+# PDF
+pymupdf>=1.23.0        # fitz — PDF text extraction + image rendering
+# ocrmypdf installed via apt (see install script)
+
+# Video (uses ffprobe/ffmpeg subprocess — no Python dep needed)
+# Image recognition via ollama API (optional)
+requests>=2.31.0       # for ollama API calls
+
+# Database + utils
+tqdm>=4.66.0           # progress bars
