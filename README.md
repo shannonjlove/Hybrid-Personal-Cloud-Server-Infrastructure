@@ -48,6 +48,10 @@ This repo is the operational blueprint for Shannon J. Love’s hybrid cloud infr
 - `.env` is local-only
 - Prefer private services behind Tailscale; publish only what must be public
 
+## Active Migration
+Docker/Traefik/Caddy are being retired in favor of Podman Quadlets + nginx. See the
+phased plan: `00-MASTER-ARCHITECTURE/podman-quadlet-migration-plan.md`.
+
 ## Troubleshooting
 See:
 - `05-DOCS/troubleshooting.md`
