@@ -32,12 +32,14 @@ go-ahead per host).
 | File naming | **Existing PARA convention**: `YYYY-MM-DD_HH-MM_category-subcategory_description_UUID24.ext` (`para-structure.md`) | Already defined; this plan applies it consistently instead of introducing a second scheme. |
 | OCR / auto-tagging engine | **Paperless-ngx** (assumed default — see note below) | Already named in `infrastructure-map.md` as the intended doc-management tool. Runs as its own Quadlet service; does OCR + tagging + full-text search out of the box for every PDF/scanned doc. |
 | Metadata storage | **Sidecar file per item, as source of truth** (assumed default — see note below) | Git-trackable, human-readable, no extra DB dependency for the repo itself. Paperless-ngx's own internal DB serves as the searchable index for anything ingested through it, satisfying both "versioned" and "queryable" without a second bespoke system. |
+| Visual content tagging engine | **PhotoPrism, as primary and authoritative source** | You confirmed: PhotoPrism's own AI (object/label detection, scene classification, face/subject recognition, color analysis) is the content-based tagging and naming engine for every image and video — not a nice-to-have layered on top of filename conventions, but the actual source the naming/tagging pipeline reads from. |
+| Geolocation resolution | **Reverse-geocode GPS EXIF to a full street address**, not just raw coordinates (assumed default — see note below) | You require pinpointed addresses, not lat/long pairs. Needs a reverse-geocoding provider — recommending **self-hosted Nominatim** (OpenStreetMap data) as the default so GPS coordinates from your personal photos never leave your infrastructure, consistent with this repo's "protect privacy at all times" principle. Google's Geocoding API is the higher-accuracy alternative but sends coordinates to Google per lookup. |
+| GCP Vision / Video Intelligence | **Optional future enrichment, gated on the GCP VM decision** | See dedicated subsection below — not part of Phases 0-7, added as Phase 8 once/if you stand up the GCP VM. |
 
-> **Note on the two decisions above:** these were asked back to you but the
-> clarifying-question tool failed on a connection error three times in a row. I've
-> proceeded with the recommended defaults so this plan isn't blocked — flag it if you'd
-> choose differently (e.g. a Tesseract-only sidecar pipeline instead of Paperless-ngx,
-> or a central SQLite index instead of/alongside sidecar files) and I'll revise.
+> **Note on decisions marked "assumed default" above:** these were asked back to you
+> but the clarifying-question tool failed on a connection error repeatedly. I've
+> proceeded with the recommended defaults so this plan isn't blocked — say so in a
+> normal reply (not the question tool) if you'd choose differently and I'll revise.
 
 ## Container & File Tagging Convention (expanded)
 
@@ -89,19 +91,68 @@ human-authored text:
   - `ocr_confidence: <if available>`
   - a `content_summary` field (short human/AI-written summary of what OCR found,
     since raw OCR dumps aren't useful as a tag)
-- **Images/photos**: PhotoPrism's AI tagging (faces, objects, labels) is pulled into
-  the same sidecar schema under `photoprism_tags: [...]` rather than living only
-  inside PhotoPrism's own DB — so tags survive even if PhotoPrism is ever replaced.
+- **Images/photos/video — PhotoPrism as primary, authoritative tagging engine**:
+  PhotoPrism's full analysis output (object/label detection, scene classification,
+  face/subject recognition, dominant colors, camera/lens model, classification
+  confidence scores) is pulled into the sidecar under `photoprism_tags: [...]`,
+  `photoprism_subjects: [...]`, `photoprism_colors: [...]`, etc. — not summarized,
+  the full structured output — so tags survive even if PhotoPrism is ever replaced,
+  and so the **filename/PARA description itself is generated from this content
+  analysis** (e.g. a photo PhotoPrism classifies as `beach, sunset, dog` renames
+  through Hazel as `..._resources-photos_beach-sunset-dog_<uuid24>.jpg`, not a
+  generic camera filename). This is the exhaustive, content-driven naming the plan
+  now includes explicitly, not just chronological/manual naming.
 - **Anything Hookmark links to**: the Hookmark deep-link ID is stored in the sidecar
   too (`hookmark_id`), closing the loop between the deep-linking layer and the
   canonical metadata record.
 
+### EXIF / embedded technical metadata (mandatory, all photo & video files)
+
+Every photo and video, wherever it lands in the system, must have its **full embedded
+metadata preserved and surfaced**, not just PhotoPrism's derived content tags:
+
+- Full EXIF (camera, lens, exposure, timestamp, orientation) + IPTC/XMP where present,
+  extracted in full into the sidecar under an `exif:` block — not a curated subset.
+- **GPS is reverse-geocoded, not left as raw coordinates.** The sidecar carries both
+  the original `gps_lat`/`gps_lon` (never discarded — it's the ground truth) **and** a
+  resolved `address:` block (`street`, `city`, `region`, `postal_code`, `country`) via
+  the reverse-geocoding provider from the Key Decisions table above.
+- This extraction runs through PhotoPrism where possible (it already parses EXIF/GPS
+  natively); the reverse-geocoding-to-address step is the one addition needed on top,
+  since PhotoPrism itself only exposes coordinates/place names, not full addresses.
+- Non-photo/video files carry whatever embedded metadata their format supports
+  (PDF `/Info` + XMP, audio ID3, etc.) into the same sidecar shape for consistency,
+  even though most won't have GPS data.
+
+### GCP Vision / Video Intelligence enrichment (future — Phase 8, gated on the GCP VM)
+
+You're considering a GCP VM and asked whether GCP's image/video recognition models
+could either supplement PhotoPrism directly or **teach/calibrate PhotoPrism's local
+models**. Two modes, both deferred to a Phase 8 that only starts once the GCP VM is
+actually stood up (not blocking Phases 0-7, and each mode has a real tradeoff to weigh
+before committing):
+
+1. **Direct enrichment pass** — send images/video through Cloud Vision API / Video
+   Intelligence API as a second tagging pass alongside PhotoPrism, merging both label
+   sets into the sidecar (`gcp_vision_tags: [...]`) tagged with `source: gcp` so it's
+   always distinguishable from PhotoPrism's own output. Tradeoff: your photos/video
+   leave local infrastructure per API call, plus per-image/per-minute GCP cost — a
+   real conflict with this repo's stated "protect privacy at all times" principle that
+   needs your explicit sign-off before any image is sent, service by service.
+2. **Model calibration/distillation** — run GCP's models once over a labeled batch and
+   use the output as higher-quality ground-truth labels to fine-tune or calibrate
+   PhotoPrism's on-device classification (improving local confidence without an
+   ongoing per-image API dependency). This is a heavier ML engineering task than
+   option 1 and would get its own sub-plan when the GCP VM materializes — noted here
+   so it isn't lost, not scoped further yet.
+
 This is what turns `03-AUTOMATION/auto-tagging/` and
 `03-AUTOMATION/metadata-persistence/` from stubs into a real, enforceable pipeline:
 new file lands → Hazel rule renames it to the PARA convention → tagging script
-OCRs it (via Paperless-ngx for documents, PhotoPrism for images) → writes/updates
-the sidecar → done. Phase 5 builds this; Phase 7's guardrail script can then flag
-any file that's missing its sidecar, the same way it flags Docker/Traefik/Caddy text.
+OCRs it (via Paperless-ngx for documents, PhotoPrism + EXIF/reverse-geocoding for
+images/video) → writes/updates the sidecar → done. Phase 5 builds this; Phase 7's
+guardrail script can then flag any file that's missing its sidecar, the same way it
+flags Docker/Traefik/Caddy text.
 
 ---
 
@@ -130,7 +181,8 @@ in `mcp-cloud-suite.tar` (5 MCP-server `.container` units + `deploy-cloud-mcp-su
   domain/subdomain, persistence needs, current phase status) — becomes
   `02-CONTAINERS/SERVICE-INVENTORY.md`. Services identified so far: Traefik (→ retired),
   BookStack (+ DB), PhotoPrism, Stash, Hookmark-sync, AI-MCP-servers (5 sub-services),
-  **Paperless-ngx (new — added for OCR/tagging, see Tagging Convention above)**.
+  **Paperless-ngx (new — OCR/tagging)**, **Nominatim (new — self-hosted reverse
+  geocoding, see EXIF/Geolocation subsection above)**.
 - Confirm with you: any services running live on Nexus/sOs *right now* that aren't
   reflected in this repo yet (the repo currently looks pre-deployment/planning-stage
   for most services except the MCP suite).
@@ -158,6 +210,9 @@ sub-services, **Paperless-ngx**), using the existing MCP-suite units as the temp
 - Add `02-CONTAINERS/paperless-ngx/` as a new service module (doesn't exist yet —
   currently only referenced in prose in `infrastructure-map.md`), scoped to OCR +
   tagging + full-text search for every PDF/document in the repo and, later, the S3 vault.
+- Add `02-CONTAINERS/nominatim/` as a new, private-only (`sjl.exposure=private`)
+  reverse-geocoding service feeding the EXIF/address pipeline — a self-contained
+  OSM-data container, no external API calls, no data leaves your infrastructure.
 - Replace root `docker-compose.yml` service-by-service until it can be deleted.
 - Each service's `README.md` "Files (Planned)" section gets replaced with the real,
   committed Quadlet units (closes out the current stub state).
@@ -192,9 +247,14 @@ sub-services, **Paperless-ngx**), using the existing MCP-suite units as the temp
 - File everything into the correct `00-06` directory — nothing stays loose at repo root
   except `README.md` itself.
 - **Run every existing binary/opaque file through OCR once** (Paperless-ngx for the
-  5 MCP PDFs + `README.pdf`; PhotoPrism for any images added later) to backfill
-  `<filename>.meta.yaml` sidecars — this is the one-time catch-up pass; going forward
-  new files get tagged at ingestion, not retroactively.
+  5 MCP PDFs + `README.pdf`; PhotoPrism + Nominatim reverse-geocoding for any
+  images/video added later) to backfill `<filename>.meta.yaml` sidecars — this is
+  the one-time catch-up pass; going forward new files get tagged at ingestion, not
+  retroactively.
+- Wire PhotoPrism's content tags directly into the Hazel renaming step so filenames
+  are content-derived (see the "PhotoPrism as primary tagging engine" note above),
+  and wire Nominatim into the same pipeline so every photo/video sidecar gets a
+  resolved address, not just coordinates.
 - Add YAML frontmatter (`para_category`, `description`, `uuid24`, `created`,
   `related_service`, `sensitivity`) to every text/config/doc file that doesn't have it.
 - Tag every Quadlet unit with the full `sjl.*` label set from the Tagging Convention
@@ -229,12 +289,24 @@ sub-services, **Paperless-ngx**), using the existing MCP-suite units as the temp
 - Quarterly repo audit (same method as Phase 0) to confirm zero drift back toward
   Docker/Traefik/Caddy, and that tagging coverage is still exhaustive.
 
+## Phase 8 — GCP Vision/Video Intelligence Enrichment (future, not yet scheduled)
+
+Only starts once the GCP VM decision is made — see the dedicated subsection above
+for the two possible modes (direct enrichment pass vs. model calibration/distillation).
+Before this phase begins, it needs its own explicit sign-off round: which mode, which
+services' images/video are in scope, and confirmation that sending them to GCP is
+acceptable given this repo's stated privacy-first posture. Not included in the
+Phase 0-7 timeline below.
+
 ---
 
 ## Suggested Timeline
 
 Assuming part-time, one-person effort: Phases 0-1 this week, Phase 2 next week,
-Phase 3 spread over ~2 weeks (one service at a time), Phase 4-5 in the following
-week, Phase 6 whenever you're ready to schedule a maintenance window per host,
-Phase 7 ongoing indefinitely. Total repo-side work (Phases 0-5): **~4-5 weeks**
-part-time. Live cutover (Phase 6) timing is yours to set.
+Phase 3 spread over ~2-3 weeks (one service at a time, now including Paperless-ngx
+and Nominatim), Phase 4-5 in the following 1-2 weeks (Phase 5 is heavier now with
+EXIF/geolocation/content-derived-naming work), Phase 6 whenever you're ready to
+schedule a maintenance window per host, Phase 7 ongoing indefinitely, Phase 8
+whenever the GCP VM decision actually happens. Total repo-side work (Phases 0-5):
+**~5-6 weeks** part-time. Live cutover (Phase 6) and GCP enrichment (Phase 8)
+timing are yours to set.
