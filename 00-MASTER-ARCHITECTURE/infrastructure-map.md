@@ -36,9 +36,18 @@ All servers connected via Tailscale mesh VPN (5 devices):
 ## Domain Architecture
 
 All services use `shannonjlove.cloud` with subdomains:
-- `docs.shannonjlove.cloud` — BookStack
-- `admin.shannonjlove.cloud` — Admin panel
-- `nexus.shannonjlove.cloud` — Nexus VPS
+
+| Subdomain | Service | Status |
+|-----------|---------|--------|
+| `nexus.shannonjlove.cloud` | Nexus VPS (Hostinger) | Active |
+| `admin.shannonjlove.cloud` | Admin Panel | Active |
+| `docs.shannonjlove.cloud` | BookStack — Knowledge Base | Active |
+| `photos.shannonjlove.cloud` | PhotoPrism — Photo Library | Active |
+| `paperless.shannonjlove.cloud` | Paperless-ngx — Documents | Planned |
+| `media.shannonjlove.cloud` | Jellyfin — Media Server | Planned |
+| `stash.shannonjlove.cloud` | Stash — Media Library | Planned |
+
+All routes managed by Traefik reverse proxy with Let's Encrypt SSL.
 
 ---
-*Last updated: February 2026*
+*Last updated: July 2026*
