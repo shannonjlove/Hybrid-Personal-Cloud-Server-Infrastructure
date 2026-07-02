@@ -30,23 +30,78 @@ go-ahead per host).
 | Reverse proxy replacement | **nginx + certbot** | Traefik and Caddy are both banned. Static nginx vhosts + certbot is the standard pairing with Podman Quadlets — routing config becomes versioned files instead of dynamic container-label discovery (which also removes the need to mount the Podman/Docker socket into the proxy container). |
 | Container orchestration | **Podman Quadlet** (`.container`/`.volume`/`.network`/`.pod` units under `systemd --user`) | Already proven in this repo — `mcp-cloud-suite.tar` ships 5 working Quadlet units. That becomes the template for every other service. |
 | File naming | **Existing PARA convention**: `YYYY-MM-DD_HH-MM_category-subcategory_description_UUID24.ext` (`para-structure.md`) | Already defined; this plan applies it consistently instead of introducing a second scheme. |
+| OCR / auto-tagging engine | **Paperless-ngx** (assumed default — see note below) | Already named in `infrastructure-map.md` as the intended doc-management tool. Runs as its own Quadlet service; does OCR + tagging + full-text search out of the box for every PDF/scanned doc. |
+| Metadata storage | **Sidecar file per item, as source of truth** (assumed default — see note below) | Git-trackable, human-readable, no extra DB dependency for the repo itself. Paperless-ngx's own internal DB serves as the searchable index for anything ingested through it, satisfying both "versioned" and "queryable" without a second bespoke system. |
 
-## New Convention Introduced by This Plan: Container Naming & Labeling
+> **Note on the two decisions above:** these were asked back to you but the
+> clarifying-question tool failed on a connection error three times in a row. I've
+> proceeded with the recommended defaults so this plan isn't blocked — flag it if you'd
+> choose differently (e.g. a Tesseract-only sidecar pipeline instead of Paperless-ngx,
+> or a central SQLite index instead of/alongside sidecar files) and I'll revise.
 
-No container-naming/labeling scheme exists today (compose files just used ad hoc
-`container_name:`). Phase 3 establishes:
+## Container & File Tagging Convention (expanded)
 
-- **Unit location**: `02-CONTAINERS/<service>/systemd/<service>.container` (+ `.volume`,
-  `.network` units alongside as needed).
-- **Podman labels** (set via `Label=` in every Quadlet unit):
-  - `sjl.category=<projects|areas|resources|archive>` (PARA category)
-  - `sjl.service=<service-name>`
-  - `sjl.node=<nexus|sos>`
-  - `sjl.managed-by=quadlet`
-  - `sjl.persistence=<volume-name-or-none>`
-- **Volume naming**: `<service>-data`, `<service>-db-data`, defined as their own
-  `.volume` Quadlet units (not implicit), so persistence is explicit and inspectable
-  via `podman volume ls --filter label=sjl.managed-by=quadlet`.
+The user asked for a **tagging convention**, not just a naming convention — and for
+**every item** (container or file) to carry exhaustive metadata, including OCR'd
+content where the item isn't natively text. This replaces the earlier, thinner
+"Container Naming & Labeling" section.
+
+### Container-level tags (Podman labels)
+
+Every Quadlet unit sets these via `Label=` — not just identity, but operational and
+security-relevant facts, so the label set alone answers "what is this, where does it
+live, what does it hold, and how sensitive is it":
+
+- `sjl.service=<service-name>` — canonical service name
+- `sjl.category=<projects|areas|resources|archive>` — PARA category
+- `sjl.node=<nexus|sos>` — which host this runs on
+- `sjl.managed-by=quadlet` — provenance/enforcement marker (also what the Phase 7
+  guardrail script checks for — anything without it is flagged as drift)
+- `sjl.persistence=<volume-name|none>` — which `.volume` unit(s) hold its state
+- `sjl.exposure=<public|private|tailscale-only>` — network reachability, so a `grep`
+  for `sjl.exposure=public` always gives the current full public attack surface
+- `sjl.data-classification=<none|personal|financial|legal|credentials>` — what kind
+  of data the service touches, driving backup/encryption priority
+- `sjl.backup-policy=<none|daily|weekly|manual>`
+- `sjl.owner=sjl` — reserved for future multi-user use, currently always you
+- `sjl.image-ref=<image>:<tag>` — exact pinned image, since Quadlets should never
+  float on `:latest` (closes a gap in the current `docker-compose.yml`, which pins
+  nothing)
+- `sjl.deployed=<YYYY-MM-DD>` — when this unit was last (re)deployed
+
+Volumes get their own subset: `sjl.service`, `sjl.persistence-role=<primary|db|cache>`,
+`sjl.backup-policy`.
+
+### File-level tags (every item in the repo, and eventually every item in the S3 vault)
+
+"Exhaustively tagged" means every file gets a metadata record whether or not it's
+human-authored text:
+
+- **Text/config/doc files** (`.md`, `.yml`, `.sh`, etc.): tagged via YAML frontmatter
+  at the top of the file itself — `para_category`, `description`, `uuid24`,
+  `created`, `related_service`, `sensitivity`.
+- **Binary/opaque files** (PDFs, images, archives — e.g. the 5 MCP PDFs, `README.pdf`,
+  `mcp-cloud-suite.tar`): can't hold frontmatter, so each gets a sidecar
+  `<filename>.meta.yaml` next to it, carrying the same fields **plus**:
+  - `ocr_text_present: true|false`
+  - `ocr_source: paperless-ngx|tesseract|none`
+  - `ocr_extracted_at: <timestamp>`
+  - `ocr_confidence: <if available>`
+  - a `content_summary` field (short human/AI-written summary of what OCR found,
+    since raw OCR dumps aren't useful as a tag)
+- **Images/photos**: PhotoPrism's AI tagging (faces, objects, labels) is pulled into
+  the same sidecar schema under `photoprism_tags: [...]` rather than living only
+  inside PhotoPrism's own DB — so tags survive even if PhotoPrism is ever replaced.
+- **Anything Hookmark links to**: the Hookmark deep-link ID is stored in the sidecar
+  too (`hookmark_id`), closing the loop between the deep-linking layer and the
+  canonical metadata record.
+
+This is what turns `03-AUTOMATION/auto-tagging/` and
+`03-AUTOMATION/metadata-persistence/` from stubs into a real, enforceable pipeline:
+new file lands → Hazel rule renames it to the PARA convention → tagging script
+OCRs it (via Paperless-ngx for documents, PhotoPrism for images) → writes/updates
+the sidecar → done. Phase 5 builds this; Phase 7's guardrail script can then flag
+any file that's missing its sidecar, the same way it flags Docker/Traefik/Caddy text.
 
 ---
 
@@ -74,7 +129,8 @@ in `mcp-cloud-suite.tar` (5 MCP-server `.container` units + `deploy-cloud-mcp-su
 - Build a single service inventory table (name, current runtime, target node,
   domain/subdomain, persistence needs, current phase status) — becomes
   `02-CONTAINERS/SERVICE-INVENTORY.md`. Services identified so far: Traefik (→ retired),
-  BookStack (+ DB), PhotoPrism, Stash, Hookmark-sync, AI-MCP-servers (5 sub-services).
+  BookStack (+ DB), PhotoPrism, Stash, Hookmark-sync, AI-MCP-servers (5 sub-services),
+  **Paperless-ngx (new — added for OCR/tagging, see Tagging Convention above)**.
 - Confirm with you: any services running live on Nexus/sOs *right now* that aren't
   reflected in this repo yet (the repo currently looks pre-deployment/planning-stage
   for most services except the MCP suite).
@@ -93,9 +149,15 @@ in `mcp-cloud-suite.tar` (5 MCP-server `.container` units + `deploy-cloud-mcp-su
 ## Phase 3 — Service-by-Service Quadlet Migration (repo work, ~1-2 weeks)
 
 For each service (BookStack+DB, PhotoPrism, Stash, Hookmark-sync, AI-MCP-servers
-sub-services), using the existing MCP-suite units as the template:
+sub-services, **Paperless-ngx**), using the existing MCP-suite units as the template:
 
-- Write `.container` / `.volume` / `.network` Quadlet units with the labeling scheme above.
+- Write `.container` / `.volume` / `.network` Quadlet units with the full label set
+  from the Tagging Convention above (not just `sjl.service`/`sjl.node` — every
+  label, including `sjl.exposure`, `sjl.data-classification`, `sjl.backup-policy`,
+  `sjl.image-ref` pinned to a digest or version tag, never `:latest`).
+- Add `02-CONTAINERS/paperless-ngx/` as a new service module (doesn't exist yet —
+  currently only referenced in prose in `infrastructure-map.md`), scoped to OCR +
+  tagging + full-text search for every PDF/document in the repo and, later, the S3 vault.
 - Replace root `docker-compose.yml` service-by-service until it can be deleted.
 - Each service's `README.md` "Files (Planned)" section gets replaced with the real,
   committed Quadlet units (closes out the current stub state).
@@ -122,18 +184,30 @@ sub-services), using the existing MCP-suite units as the template:
   a `99-ARCHIVE/` (PARA "Archive") rather than delete, per the non-destructive
   default in `06-OPS/approvals/POLICY.md`.
 
-## Phase 5 — Canonical File System Pass (repo work, ~3-5 days)
+## Phase 5 — Canonical File System Pass (repo work, ~4-6 days — expanded for exhaustive tagging)
 
 - Apply the PARA naming convention (`YYYY-MM-DD_HH-MM_category-subcategory_description_UUID24.ext`)
   to loose root-level files that don't fit it yet: the 5 MCP PDFs, `README.pdf`,
   `mcp-cloud-suite.tar`/`.zip` duplicate.
 - File everything into the correct `00-06` directory — nothing stays loose at repo root
   except `README.md` itself.
-- Tag every Quadlet unit and doc with the `sjl.*` label scheme (containers) or matching
-  frontmatter/metadata (docs), so persistence and provenance are inspectable everywhere.
-- Cross-link `03-AUTOMATION/auto-tagging/` and `03-AUTOMATION/metadata-persistence/`
-  stubs into real scripts that apply this scheme automatically to new files (extends
-  the existing Hazel-rule automation described in `para-structure.md`).
+- **Run every existing binary/opaque file through OCR once** (Paperless-ngx for the
+  5 MCP PDFs + `README.pdf`; PhotoPrism for any images added later) to backfill
+  `<filename>.meta.yaml` sidecars — this is the one-time catch-up pass; going forward
+  new files get tagged at ingestion, not retroactively.
+- Add YAML frontmatter (`para_category`, `description`, `uuid24`, `created`,
+  `related_service`, `sensitivity`) to every text/config/doc file that doesn't have it.
+- Tag every Quadlet unit with the full `sjl.*` label set from the Tagging Convention
+  above, so persistence, exposure, and data classification are inspectable via
+  `podman inspect`/`podman volume ls` for every container, not just named per-service.
+- Build the tagging pipeline script(s) under `03-AUTOMATION/auto-tagging/` and
+  `03-AUTOMATION/metadata-persistence/` (currently stubs): new file → Hazel renames
+  it to PARA convention → script OCRs/tags it → sidecar written/updated. Extends the
+  existing Hazel-rule automation described in `para-structure.md` rather than
+  replacing it.
+- Confirm coverage is exhaustive: every file in the repo has either (a) frontmatter,
+  (b) a `.meta.yaml` sidecar, or (c) is itself a `.meta.yaml`/generated artifact
+  exempt by rule — Phase 7's guardrail extends to flag any file matching none of these.
 
 ## Phase 6 — Live Cutover (requires your explicit approval, per host)
 
@@ -147,11 +221,13 @@ sub-services), using the existing MCP-suite units as the template:
 
 ## Phase 7 — Ongoing Guardrails
 
-- Guardrail script from Phase 4 stays permanently wired into pre-commit / CI.
+- Guardrail script from Phase 4 stays permanently wired into pre-commit / CI, and gets
+  a second check added in Phase 5: flag any file missing frontmatter/sidecar tagging,
+  and any Quadlet unit missing a required `sjl.*` label.
 - `02-CONTAINERS/<service>/README.md` becomes the source of truth per service instead
   of "Files (Planned)" stubs — update as part of any future service change.
 - Quarterly repo audit (same method as Phase 0) to confirm zero drift back toward
-  Docker/Traefik/Caddy.
+  Docker/Traefik/Caddy, and that tagging coverage is still exhaustive.
 
 ---
 
