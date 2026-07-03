@@ -1,0 +1,65 @@
+flowchart TB
+    classDef live fill:#198754,color:#fff,stroke:#146c43,stroke-width:2px
+    classDef migrate fill:#0d6efd,color:#fff,stroke:#0a53be,stroke-width:2px
+    classDef dead fill:#dc3545,color:#fff,stroke:#b02a37,stroke-width:2px
+    classDef never fill:#000,color:#fff,stroke:#dc3545,stroke-width:3px
+    classDef unknown fill:#6c757d,color:#fff,stroke:#495057,stroke-width:2px
+    classDef cloud fill:#17a2b8,color:#fff,stroke:#138496,stroke-width:2px
+
+    subgraph CLIENTS["ChatGPT Connector Registrations"]
+        direction LR
+        CV2["SJL Unified Cloud MCP V2\nMIGRATE to port 8799"]:::migrate
+        CV1["SJL Unified Cloud MCP\nDECOMMISSION after V2 migrated"]:::dead
+        CORA["SJL Oracle MCP\nBROKEN - no OCI mount"]:::dead
+    end
+
+    subgraph VPS["Hostinger VPS — shannonjlove — 72.61.74.250 — Ubuntu 24.04"]
+
+        subgraph NEWGW["New Unified Gateway - Active"]
+            GW99["sjl-unified-mcp.service\n0.0.0.0:8799\n17 tools · streamable-HTTP\nwrite-gated · allowlisted\nTARGET STATE"]:::live
+        end
+
+        subgraph LEGACYGW["Legacy Gateways - Pending Decommission"]
+            GW97["sjl-cloud-access-mcp.service\n0.0.0.0:8797\nread-only · no write token\nDECOMMISSION after V2 migrated"]:::dead
+            OCI98["76500_oci-mcp-rw\n127.0.0.1:8798\nstandalone OCI MCP\nDECOMMISSION after validation"]:::dead
+        end
+
+        subgraph PROTECTED["Protected - Never Modify"]
+            GW77["sjl-cloud-access-mcp-rw\n127.0.0.1:8777\nguarded write gateway\nNEVER STOP - NEVER RESTART - NEVER MODIFY"]:::never
+        end
+
+        subgraph UNKNOWN["Unidentified - Audit Required"]
+            P8811["Unknown Process\n127.0.0.1:8811\nidentify before any action"]:::unknown
+        end
+
+        subgraph PODMAN["Rootless Podman Fleet — user: sjl — CURRENTLY BROKEN: cannot clone"]
+            direction LR
+            PM1["webtopsjl\nmemory-platform\nsjl-mcp-gateway"]
+            PM2["sjl-hostinger-mcp\nsjl-oracle-mcp\nmcp-filesystem"]
+            PM3["mcp-memory\ngithub-mcp\nrclone-mcp"]
+            PM4["n8n · jellyfin\npaperless · bookstack\nnginx-proxy-manager"]
+        end
+
+        subgraph SYSTEM["System State"]
+            SYS1["23 pending updates\nincl 11 security patches\nRESTART REQUIRED\nlikely root cause of Podman fault"]:::dead
+        end
+    end
+
+    subgraph CLOUD["Cloud Providers"]
+        OCI["Oracle Cloud\ntenancy: lovecloud\nhome: us-ashburn-1\n1 instance · 1 VCN · 1 subnet\nAUTH: WORKING via unified gateway"]:::live
+        GCP["Google Cloud\nproject: resourcespace-nexus\nStorage API: working\nCompute API: DISABLED\nIAM API: DISABLED\ndecision required"]:::unknown
+        HOST["Hostinger API\ndevelopers.hostinger.com\ntoken: present\nVPS ID: 1174666\nAPI path: NEEDS VERIFICATION"]:::unknown
+    end
+
+    CV2 -- TARGET migrate URL to 8799 --> GW99
+    CV1 -- currently pointing to --> GW97
+    CORA -- broken --> PM2
+
+    GW99 --> OCI
+    GW99 --> GCP
+    GW99 --> HOST
+    GW99 -. blocked by Podman fault .-> PODMAN
+
+    GW97 -- degraded read-only --> OCI
+    GW97 -- degraded --> GCP
+    GW97 -- 404 error --> HOST
