@@ -66,9 +66,9 @@ from typing import Any
 import requests
 from mcp.server.fastmcp import FastMCP
 
-mcp = FastMCP("SJL Unified Cloud MCP")
+PORT = int(os.getenv("SJL_UNIFIED_MCP_PORT", "8799"))
+mcp = FastMCP("SJL Unified Cloud MCP", host="0.0.0.0", port=PORT)
 
-PORT = int(os.getenv("SJL_UNIFIED_MCP_PORT", "8797"))
 WRITE_TOKEN = os.getenv("WRITE_APPROVAL_TOKEN", "")
 SERVICE_USER = os.getenv("HOSTINGER_ROOTLESS_USER", "sjl")
 BOOKSTACK_URL = os.getenv("BOOKSTACK_URL", "").rstrip("/")
@@ -388,7 +388,7 @@ if __name__ == "__main__":
         print("WARNING: Missing configuration:", file=sys.stderr)
         for e in errors:
             print(f"  - {e}", file=sys.stderr)
-    mcp.run(transport="streamable-http", host="0.0.0.0", port=PORT)
+    mcp.run(transport="streamable-http")
 PY
 
 chown "$USER_NAME:$GROUP_NAME" "$APP_DIR/server.py"
