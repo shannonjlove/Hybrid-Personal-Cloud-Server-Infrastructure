@@ -134,15 +134,37 @@ for svc in nginx-proxy-manager bookstack photoprism paperless; do
   systemctl is-active "${svc}.service" 2>/dev/null || echo "inactive"
 done
 
+# ── 8. Configure NPM proxy hosts via API ─────────────────────────────────────
+
 echo ""
-echo "==> Done! Next steps:"
-echo "    1. Open NPM admin: http://<tailscale-ip>:81"
-echo "       Login: admin@example.com / changeme  → change immediately"
-echo "    2. Add proxy hosts (all with SSL → Let's Encrypt):"
-echo "       paperless.shannonjlove.cloud → http://paperless:8000"
-echo "       docs.shannonjlove.cloud      → http://bookstack:6875"
-echo "       photos.shannonjlove.cloud    → http://photoprism:2342"
-echo "    3. Create Paperless admin user:"
-echo "       02-CONTAINERS/paperless-ngx/scripts/create-superuser.sh"
+echo "==> Configuring NPM proxy hosts + Let's Encrypt SSL..."
+echo "    (Uses NPM default credentials — change them in NPM_EMAIL / NPM_PASSWORD"
+echo "     if you've already updated the admin account.)"
+
+SETUP_SCRIPT="$REPO/02-CONTAINERS/nginx-proxy-manager/scripts/setup-proxy-hosts.sh"
+if [ -f "$SETUP_SCRIPT" ]; then
+  bash "$SETUP_SCRIPT"
+else
+  echo "  WARN: $SETUP_SCRIPT not found — configure proxy hosts manually in NPM UI."
+fi
+
+# ── 9. Create Paperless superuser ─────────────────────────────────────────────
+
+echo ""
+echo "==> Creating Paperless admin user..."
+SUPERUSER_SCRIPT="$REPO/02-CONTAINERS/paperless-ngx/scripts/create-superuser.sh"
+if [ -f "$SUPERUSER_SCRIPT" ]; then
+  bash "$SUPERUSER_SCRIPT"
+else
+  echo "  WARN: $SUPERUSER_SCRIPT not found — create superuser manually."
+fi
+
+echo ""
+echo "==> All done!"
+echo ""
+echo "    Services:  https://paperless.shannonjlove.cloud"
+echo "               https://docs.shannonjlove.cloud"
+echo "               https://photos.shannonjlove.cloud"
+echo "    NPM admin: http://<tailscale-ip>:81  (change default password!)"
 echo ""
 echo "    Logs: journalctl -u <service>.service -f"
