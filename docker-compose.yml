@@ -1,7 +1,6 @@
 # =============================================================================
 # Hybrid Personal Cloud Server Infrastructure
-# Master Docker Compose 2
- Service Definitions
+# Master Docker Compose -- Service Definitions
 # =============================================================================
 # IMPORTANT: This is a sanitized template. Replace all placeholder values
 # with actual configuration before deployment.

@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "sjl-unified-cloud-mcp": {
+      "type": "http",
+      "url": "http://shannonjlove.cloud:8797/mcp",
+      "note": "Public write-enabled gateway. Requires repair (guarded-repair-v1.7.sh) if readonly=true."
+    },
+    "sjl-unified-cloud-mcp-rw-loopback": {
+      "type": "http",
+      "url": "http://127.0.0.1:8777/mcp",
+      "note": "Guarded read/write backend. Only reachable from the Hostinger VPS loopback. Use via SSH tunnel if needed."
+    }
+  }
+}

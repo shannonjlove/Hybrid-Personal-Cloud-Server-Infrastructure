@@ -1,0 +1,75 @@
+flowchart TD
+    classDef stop fill:#dc3545,color:#fff,stroke:#b02a37,stroke-width:3px
+    classDef action fill:#198754,color:#fff,stroke:#146c43,stroke-width:2px
+    classDef decision fill:#ffc107,color:#000,stroke:#cc9a06,stroke-width:2px
+    classDef terminal fill:#212529,color:#fff,stroke:#000,stroke-width:3px
+
+    START([Issue or Unexpected Behavior Detected]):::terminal
+    START --> RULE
+
+    RULE["CANONICAL RULE - NO EXCEPTIONS\n\n1  Analyze system logs and configs FIRST\n2  Research official docs and real solved cases before recommending\n3  Dry run every change before executing\n4  Document all outcomes after completion\n\nNo guessing. No random tries. Evidence only."]:::stop
+
+    RULE --> EV
+
+    subgraph EV["PHASE 1 — EVIDENCE COLLECTION"]
+        direction TB
+        E1["System Logs\njournalctl -u SERVICE -n 100\npodman logs CONTAINER --tail 200\ndocker logs CONTAINER --tail 200"]
+        E2["Configuration Files\nenv files · systemd unit files\ncompose · quadlets · secret mounts\ncurrent port bindings: ss -ltnp"]
+        E3["Incident History\ngit log · runbooks · prior session notes\nprevious error patterns for this service"]
+        E1 --- E2 --- E3
+    end
+
+    EV --> RE
+
+    subgraph RE["PHASE 2 — RESEARCH"]
+        direction TB
+        R1["Official Documentation\nSDK · API reference · Release notes\nChangelog · Migration guides · Known bugs"]
+        R2["Issue Trackers\nGitHub Issues · Pull Requests\nVersion-specific regressions · Breaking changes"]
+        R3["Community Sources\nForums · Stack Overflow · Reddit\nDiscord · Real solved threads with confirmed fixes"]
+        R1 --- R2 --- R3
+    end
+
+    RE --> RCA{Root Cause\nIdentified?}:::decision
+    RCA -- No - gather more evidence --> EV
+    RCA -- Yes --> DS
+
+    subgraph DS["PHASE 3 — SOLUTION DESIGN"]
+        direction TB
+        SD1["Cross-Reference Against SJL Infrastructure\nCheck port conflicts\nVerify service dependencies\nReview security constraints"]
+        SD2["Draft Minimal Surgical Fix\nSmallest possible change\nNo unrelated cleanup\nExplicit rollback plan for every step"]
+        SD3["Dry Run\nSimulate all changes\nVerify expected output\nConfirm no side effects on other services"]
+        SD1 --> SD2 --> SD3
+    end
+
+    DS --> DR{Dry Run\nPassed?}:::decision
+    DR -- No - revise solution --> DS
+    DR -- Yes --> PRESENT
+
+    PRESENT["Present to User\nExact commands to run\nWhat will change\nExpected terminal output\nRollback commands"]:::action
+
+    PRESENT --> EXEC["User Executes Commands in Terminal"]:::action
+    EXEC --> VA
+
+    subgraph VA["PHASE 4 — VALIDATION"]
+        direction TB
+        V1["Service Status\nsystemctl status · podman ps · docker ps"]
+        V2["Port and Bind Verification\nss -ltnp · curl health endpoint"]
+        V3["Protocol-Level Probe\nMCP initialize · tools/list\nSSE or HTTP response check"]
+        V4["End-to-End Functional Test\nAll tools respond correctly\nWrite operations gated by approval token\nRead operations return real data"]
+        V1 --- V2 --- V3 --- V4
+    end
+
+    VA --> PASS{All Checks\nPassed?}:::decision
+    PASS -- No - new evidence found --> EV
+    PASS -- Yes --> DO
+
+    subgraph DO["PHASE 5 — DOCUMENT AND ARCHIVE"]
+        direction TB
+        D1["Repository\nUpdate runbook in 06-OPS/runbooks\nCommit with descriptive message\nPush to branch"]
+        D2["BookStack\nbookstack_page_upsert via unified gateway\nCanonical knowledge base entry"]
+        D3["Paperless NGX\nFile incident report\nTag and archive for future reference"]
+        D4["Architecture Diagram\nUpdate Mermaid source\nRe-render and re-upload"]
+        D1 --- D2 --- D3 --- D4
+    end
+
+    DO --> DONE([Resolved and Documented - Ready for Next Issue]):::terminal
