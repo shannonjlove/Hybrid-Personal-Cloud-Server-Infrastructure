@@ -78,9 +78,9 @@ any file in this repository and will not be committed.** This repo's own
 `.gitignore` already bans exactly this class of thing (`.env`, `.env.*`,
 `secrets/`, `**/*secret*`), consistent with `README.md`'s "No secrets committed
 to git" rule and `06-OPS/approvals/POLICY.md`. The plan: the license key lives in
-a git-ignored `webtop-sjl.env` file on whichever host actually runs WebTopSJL
+a git-ignored `webtopsjl.env` file on whichever host actually runs WebTopSJL
 (not in this repo, not in any committed unit file), referenced from the Quadlet
-unit via `EnvironmentFile=%h/.config/containers/systemd/webtop-sjl.env` — the
+unit via `EnvironmentFile=%h/.config/containers/systemd/webtopsjl.env` — the
 same pattern the existing `mcp-cloud-suite.tar` Quadlets already use for their
 own secrets. The install script reads the key from that environment variable at
 runtime; the committed `.container` unit never contains the literal key.
@@ -292,7 +292,7 @@ sub-services, **Paperless-ngx**), using the existing MCP-suite units as the temp
 - Add `02-CONTAINERS/nominatim/` as a new, private-only (`sjl.exposure=private`)
   reverse-geocoding service feeding the EXIF/address pipeline — a self-contained
   OSM-data container, no external API calls, no data leaves your infrastructure.
-- Add `02-CONTAINERS/webtop-sjl/` (`linuxserver/webtop` Quadlet, `sjl.exposure=private`)
+- Add `02-CONTAINERS/webtopsjl/` (`linuxserver/webtop` Quadlet, `sjl.exposure=private`)
   installing **Beyond Compare 4 Pro** (`bcompare-4.4.7.28397_amd64.deb`, matching
   your Multi-Platform license) inside it via a build step in the Containerfile/
   install script. License key is read at runtime from a git-ignored
