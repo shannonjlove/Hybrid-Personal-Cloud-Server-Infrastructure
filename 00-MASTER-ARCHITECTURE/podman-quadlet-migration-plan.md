@@ -52,7 +52,7 @@ something that can't actually run:
 | Tool | Platform reality | Verdict |
 |---|---|---|
 | **DeltaWalker v4** | **Correction to an earlier version of this doc:** double-checked directly against deltawalker.com and the official Homebrew Cask index — Deltopia does **not** currently ship a Linux build. The live download page lists macOS/Windows only with a "Linux builds coming soon" notice, and Homebrew's cask is macOS-only (`.dmg`, v2.8.1, even older than the v4 license you hold). | **Not feasible today.** Superseded below — resolved by using Beyond Compare instead. |
-| **Beyond Compare** (RESOLVED — you already hold a license, older version) | Verified via Scooter Software's official download page: native `.deb`/`.rpm` Linux builds exist (current: `bcompare-5.2.3.32296`). Your existing older license key should still activate an older Linux build if Scooter Software's site/archive offers one, or run under the newer installer depending on your license terms. | **This is the tool WebTopSJL actually gets built around.** Feature-equivalent to DeltaWalker (file+folder diff, 3-way merge, folder sync/mirror, image comparison) and already licensed — no new purchase, no waiting on Deltopia. |
+| **Beyond Compare 4 Pro (Multi-Platform)** (RESOLVED — confirmed license held) | Verified: Scooter Software's site has a dedicated "Older Versions → Version 4" page (`scootersoftware.com/download/v4`) with the exact matching Linux build: `bcompare-4.4.7.28397_amd64.deb` (also `.rpm`, and i386 variants). "Multi-Platform" licenses activate the same key across Windows/macOS/Linux, so this v4 Linux build is the correct, license-matched install target — not the newer v5.2.3 shown on the main download page. | **Resolved and ready to build.** Exact package identified; install script can be written now. |
 | **ABBYY FineReader** | The desktop "FineReader PDF" product is Windows/Mac only — no Linux build. ABBYY does sell a separate Linux-targeted **server/SDK** product (FlexiCapture/FineReader Engine) for automated pipelines, but that's a different product and license from a desktop reader seat. | **Depends on which license you hold** — still an open question below. If it's the desktop app, it can't be wired into the headless Podman pipeline; it would stay a manual, interactive tool. |
 | **NeoFinder** | Mac-only. No Windows or Linux version has ever existed. It catalogs locally-mounted volumes (drives, network shares) with thumbnails/metadata — it has no concept of "cloud services" directly, only whatever's mounted as a filesystem. | **Not containerizable on this Linux infrastructure.** Running it would require an actual macOS environment (real Apple hardware, or a Mac-hosting provider like MacStadium — Apple's EULA blocks virtualizing macOS on non-Apple hardware). This is a fundamentally different infra track than Podman Quadlets on Nexus/sOs. |
 
@@ -60,21 +60,32 @@ something that can't actually run:
 `linuxserver/webtop` — a full Linux desktop (XFCE/KDE) rendered in-browser via
 KasmVNC, deployed like any other service (its own `.container`/`.volume` units,
 full `sjl.*` label set, `sjl.exposure=private`/Tailscale-only since it's an admin
-tool, not public). **Beyond Compare (your existing license) installs inside it via
-the official `.deb`**, replacing DeltaWalker v4 as the actual diff/merge/sync tool
-for this environment. This becomes a real Phase 3 addition once confirmed. The
-DeltaWalker v4 license stays on the shelf — worth revisiting only if Deltopia ever
-actually ships Linux, but it's no longer a blocker on WebTopSJL.
+tool, not public). **Beyond Compare 4 Pro (`bcompare-4.4.7.28397_amd64.deb`)
+installs inside it**, replacing DeltaWalker v4 as the actual diff/merge/sync tool
+for this environment. The DeltaWalker v4 license stays on the shelf — worth
+revisiting only if Deltopia ever actually ships Linux, but it's no longer a
+blocker on WebTopSJL.
 
 **What it can't be, no matter how it's packaged:** a place to run NeoFinder or
 (desktop) ABBYY FineReader, since a Linux desktop container still only runs Linux
 binaries — it's not emulation or virtualization of macOS/Windows.
 
+### License key handling — not stored in this repo
+
+You shared your Beyond Compare license key in chat. **It has not been written to
+any file in this repository and will not be committed.** This repo's own
+`.gitignore` already bans exactly this class of thing (`.env`, `.env.*`,
+`secrets/`, `**/*secret*`), consistent with `README.md`'s "No secrets committed
+to git" rule and `06-OPS/approvals/POLICY.md`. The plan: the license key lives in
+a git-ignored `webtop-sjl.env` file on whichever host actually runs WebTopSJL
+(not in this repo, not in any committed unit file), referenced from the Quadlet
+unit via `EnvironmentFile=%h/.config/containers/systemd/webtop-sjl.env` — the
+same pattern the existing `mcp-cloud-suite.tar` Quadlets already use for their
+own secrets. The install script reads the key from that environment variable at
+runtime; the committed `.container` unit never contains the literal key.
+
 **One thing still open before I write the WebTopSJL + Beyond Compare Quadlet units:**
-which exact Beyond Compare version/license tier do you hold (Standard vs. Pro,
-and the version number), so the install script pulls a build your license key
-actually activates rather than assuming the current v5.2.3? And separately, still
-unresolved from before —
+still unresolved from before —
 1. Which ABBYY product/license do you actually hold — the desktop FineReader
    (Mac or Windows), or a server/SDK product? That determines whether it joins the
    automated OCR pipeline (Phase 3, alongside Paperless-ngx) or stays a manual tool
@@ -248,9 +259,8 @@ in `mcp-cloud-suite.tar` (5 MCP-server `.container` units + `deploy-cloud-mcp-su
   `02-CONTAINERS/SERVICE-INVENTORY.md`. Services identified so far: Traefik (→ retired),
   BookStack (+ DB), PhotoPrism, Stash, Hookmark-sync, AI-MCP-servers (5 sub-services),
   **Paperless-ngx (new — OCR/tagging)**, **Nominatim (new — self-hosted reverse
-  geocoding, see EXIF/Geolocation subsection above)**, **WebTopSJL (new — pending
-  your remaining answers in the Legacy Desktop Tooling section above; hosts Beyond
-  Compare, your existing license, replacing DeltaWalker v4)**.
+  geocoding, see EXIF/Geolocation subsection above)**, **WebTopSJL (new — ready to
+  build; hosts Beyond Compare 4 Pro, license resolved, replacing DeltaWalker v4)**.
 - Confirm with you: any services running live on Nexus/sOs *right now* that aren't
   reflected in this repo yet (the repo currently looks pre-deployment/planning-stage
   for most services except the MCP suite).
@@ -282,11 +292,12 @@ sub-services, **Paperless-ngx**), using the existing MCP-suite units as the temp
   reverse-geocoding service feeding the EXIF/address pipeline — a self-contained
   OSM-data container, no external API calls, no data leaves your infrastructure.
 - Add `02-CONTAINERS/webtop-sjl/` (`linuxserver/webtop` Quadlet, `sjl.exposure=private`)
-  with **Beyond Compare** (your existing license) installed inside it via the
-  official `.deb` — this is now unblocked and doesn't need to wait on the two
-  remaining open questions below, since it no longer depends on DeltaWalker v4 or
-  on ABBYY/NeoFinder. Still need your exact Beyond Compare version/license tier
-  (Standard vs. Pro) before pinning an install script to a specific build.
+  installing **Beyond Compare 4 Pro** (`bcompare-4.4.7.28397_amd64.deb`, matching
+  your Multi-Platform license) inside it via a build step in the Containerfile/
+  install script. License key is read at runtime from a git-ignored
+  `EnvironmentFile=` (see "License key handling" above) — never hardcoded in the
+  committed unit. This is now fully unblocked and ready to build; no longer
+  depends on DeltaWalker v4 or on ABBYY/NeoFinder.
   ABBYY FineReader joins the OCR pipeline here only if it turns out to be a
   Linux-capable server/SDK product; otherwise it's documented as a manual tool,
   not part of the automated Quadlet services. NeoFinder is out of scope for this
