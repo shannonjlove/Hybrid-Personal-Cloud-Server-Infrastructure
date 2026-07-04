@@ -1,0 +1,7 @@
+# Internal network — bookstack <-> bookstack-db only
+# Install to: /etc/containers/systemd/bookstack.network
+
+[Network]
+NetworkName=bookstack
+Driver=bridge
+Label=app=bookstack

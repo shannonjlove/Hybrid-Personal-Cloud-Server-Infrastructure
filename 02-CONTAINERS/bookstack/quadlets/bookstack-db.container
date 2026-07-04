@@ -1,0 +1,27 @@
+# Podman Quadlet — BookStack MariaDB
+# Install to: /etc/containers/systemd/bookstack-db.container
+# Reads MYSQL_* vars from EnvironmentFile.
+
+[Unit]
+Description=BookStack Database (MariaDB)
+After=network-online.target bookstack-network.service
+Requires=bookstack-network.service
+
+[Container]
+Image=docker.io/mariadb:lts
+ContainerName=bookstack-db
+Network=bookstack.network
+Volume=bookstack-db-data.volume:/var/lib/mysql:Z
+EnvironmentFile=/etc/bookstack/bookstack.env
+HealthCmd=healthcheck.sh --connect --innodb_initialized
+HealthInterval=30s
+HealthRetries=5
+HealthTimeout=10s
+Label=app=bookstack
+
+[Service]
+Restart=always
+TimeoutStartSec=120
+
+[Install]
+WantedBy=multi-user.target default.target

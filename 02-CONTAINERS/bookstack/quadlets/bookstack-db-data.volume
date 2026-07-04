@@ -1,0 +1,5 @@
+# Install to: /etc/containers/systemd/bookstack-db-data.volume
+
+[Volume]
+VolumeName=bookstack-db-data
+Label=app=bookstack

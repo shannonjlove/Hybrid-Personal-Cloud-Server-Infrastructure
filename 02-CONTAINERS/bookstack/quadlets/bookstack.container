@@ -1,0 +1,32 @@
+# Podman Quadlet — BookStack
+# Install to: /etc/containers/systemd/bookstack.container
+#
+# NPM proxy host: docs.shannonjlove.cloud → http://bookstack:6875
+
+[Unit]
+Description=BookStack knowledge base
+After=network-online.target infra-network.service bookstack-network.service
+After=bookstack-db.service
+Requires=bookstack-db.service infra-network.service bookstack-network.service
+
+[Container]
+Image=docker.io/linuxserver/bookstack:latest
+ContainerName=bookstack
+# infra — NPM reaches bookstack at bookstack:6875
+# bookstack — internal comms with bookstack-db
+Network=infra.network
+Network=bookstack.network
+Volume=bookstack-data.volume:/config:Z
+EnvironmentFile=/etc/bookstack/bookstack.env
+HealthCmd=curl -sf http://localhost:6875/status || exit 1
+HealthInterval=30s
+HealthRetries=3
+HealthTimeout=10s
+Label=app=bookstack
+
+[Service]
+Restart=always
+TimeoutStartSec=180
+
+[Install]
+WantedBy=multi-user.target default.target

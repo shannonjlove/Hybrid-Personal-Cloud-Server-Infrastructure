@@ -1,0 +1,5 @@
+# Install to: /etc/containers/systemd/npm-data.volume
+
+[Volume]
+VolumeName=npm-data
+Label=app=npm

@@ -1,0 +1,5 @@
+# Install to: /etc/containers/systemd/photoprism-data.volume
+
+[Volume]
+VolumeName=photoprism-data
+Label=app=photoprism

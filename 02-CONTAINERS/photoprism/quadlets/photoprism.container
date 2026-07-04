@@ -1,0 +1,29 @@
+# Podman Quadlet — PhotoPrism
+# Install to: /etc/containers/systemd/photoprism.container
+#
+# NPM proxy host: photos.shannonjlove.cloud → http://photoprism:2342
+
+[Unit]
+Description=PhotoPrism photo management
+After=network-online.target infra-network.service
+Requires=infra-network.service
+
+[Container]
+Image=docker.io/photoprism/photoprism:latest
+ContainerName=photoprism
+Network=infra.network
+Volume=photoprism-data.volume:/photoprism/storage:Z
+Volume=/opt/photoprism/originals:/photoprism/originals:Z
+EnvironmentFile=/etc/photoprism/photoprism.env
+HealthCmd=curl -sf http://localhost:2342/api/v1/status || exit 1
+HealthInterval=30s
+HealthRetries=3
+HealthTimeout=10s
+Label=app=photoprism
+
+[Service]
+Restart=always
+TimeoutStartSec=180
+
+[Install]
+WantedBy=multi-user.target default.target

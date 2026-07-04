@@ -8,28 +8,25 @@
 
 [Unit]
 Description=Paperless-NGX document management
-After=network-online.target paperless-network.service
+After=network-online.target infra-network.service paperless-network.service
 After=paperless-broker.service paperless-db.service
 After=paperless-gotenberg.service paperless-tika.service
-Requires=paperless-broker.service paperless-db.service
+Requires=paperless-broker.service paperless-db.service infra-network.service
 
 [Container]
 Image=ghcr.io/paperless-ngx/paperless-ngx:latest
 ContainerName=paperless
+# infra — NPM reaches paperless at paperless:8000
+# paperless — internal comms with broker, db, gotenberg, tika
+Network=infra.network
 Network=paperless.network
 
-# Bind mounts — owner must match USERMAP_UID/GID in env file
 Volume=/opt/paperless/data:/usr/src/paperless/data:Z
 Volume=/opt/paperless/media:/usr/src/paperless/media:Z
 Volume=/opt/paperless/export:/usr/src/paperless/export:Z
 Volume=/opt/paperless/consume:/usr/src/paperless/consume:Z
 
-# All config via env file — see .env.example for required keys
 EnvironmentFile=/etc/paperless/paperless.env
-
-# Published on loopback + Docker bridge so Traefik can reach it.
-# Hostinger firewall should block 8000 from public internet.
-PublishPort=8000:8000
 
 Label=app=paperless
 

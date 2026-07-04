@@ -1,0 +1,45 @@
+# Podman Quadlet — Nginx Proxy Manager
+# Install to: /etc/containers/systemd/nginx-proxy-manager.container
+#
+# After first start, access admin UI via Tailscale:
+#   http://<tailscale-ip>:81
+#   Default: admin@example.com / changeme  (change immediately)
+#
+# Add proxy hosts in the UI pointing to container names on the infra network:
+#   paperless.shannonjlove.cloud  → http://paperless:8000
+#   docs.shannonjlove.cloud       → http://bookstack:6875
+#   photos.shannonjlove.cloud     → http://photoprism:2342
+# Enable "Request a new SSL Certificate" with Let's Encrypt on each.
+
+[Unit]
+Description=Nginx Proxy Manager
+After=network-online.target infra-network.service
+Requires=infra-network.service
+
+[Container]
+Image=docker.io/jc21/nginx-proxy-manager:latest
+ContainerName=nginx-proxy-manager
+Network=infra.network
+
+# Public traffic
+PublishPort=80:80
+PublishPort=443:443
+# Admin UI — firewall this port; access only via Tailscale
+PublishPort=81:81
+
+Volume=npm-data.volume:/data:Z
+Volume=npm-letsencrypt.volume:/etc/letsencrypt:Z
+
+HealthCmd=curl -sf http://localhost:81/api/ || exit 1
+HealthInterval=30s
+HealthRetries=3
+HealthTimeout=10s
+
+Label=app=npm
+
+[Service]
+Restart=always
+TimeoutStartSec=120
+
+[Install]
+WantedBy=multi-user.target default.target

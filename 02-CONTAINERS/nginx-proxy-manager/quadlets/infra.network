@@ -1,0 +1,8 @@
+# Shared Podman network — all services that NPM proxies must join this network.
+# NPM resolves backends by container name (e.g. paperless:8000, bookstack:6875).
+# Install to: /etc/containers/systemd/infra.network
+
+[Network]
+NetworkName=infra
+Driver=bridge
+Label=app=infra
