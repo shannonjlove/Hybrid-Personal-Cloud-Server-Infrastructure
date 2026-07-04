@@ -1,0 +1,16 @@
+[Unit]
+Description=SJL Memory Agent — file CRUD, no external API, no cost
+After=network-online.target
+
+[Container]
+Image=localhost/memory-agent:latest
+ContainerName=memory-agent
+PublishPort=100.115.66.75:8100:8000
+Volume=/mnt/shared-context/memory-agent:/memories:Z
+
+[Service]
+Restart=on-failure
+TimeoutStartSec=60
+
+[Install]
+WantedBy=multi-user.target

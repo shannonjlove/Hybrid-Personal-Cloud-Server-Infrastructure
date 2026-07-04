@@ -2,9 +2,11 @@
 # SJL Shared Context — Nexus deployment
 # 1. Creates /opt/shared-context (real data) bind-mounted to /mnt/shared-context
 #    (so every node addresses the same absolute path)
-# 2. Seeds README.md, infrastructure-rules.md, initial claude-memories/
+# 2. Seeds README.md, infrastructure-rules.md, claude-memories/, memory-agent/
 # 3. Exports /mnt/shared-context via NFS, restricted to the Tailscale subnet only
 # 4. Installs the claude-memory stdio MCP server (no container — direct subprocess)
+# 5. Repoints the existing memory-agent Quadlet's volume at the shared folder
+#    and migrates any existing data into it
 
 set -euo pipefail
 
@@ -12,9 +14,11 @@ REAL_DIR="/opt/shared-context"
 MOUNT_DIR="/mnt/shared-context"
 TAILSCALE_SUBNET="100.64.0.0/10"   # Tailscale's CGNAT allocation range
 CLAUDE_MEMORY_LIB="${HOME}/.local/lib/claude-memory"
+QUADLET_DIR="/etc/containers/systemd"
+MEMORY_AGENT_DATA_OLD="/opt/memory-agent/data"
 
 echo "==> Creating ${REAL_DIR} and bind-mounting to ${MOUNT_DIR}"
-mkdir -p "${REAL_DIR}/claude-memories"
+mkdir -p "${REAL_DIR}"/{claude-memories,memory-agent}
 mkdir -p "${MOUNT_DIR}"
 
 if ! mountpoint -q "${MOUNT_DIR}"; then
@@ -343,64 +347,22 @@ cat > "${CLAUDE_SETTINGS_DIR}/settings.json" <<EOF
 }
 EOF
 
-echo "==> Seeding initial claude-memories (skip if files already exist)"
-MEMORIES_DIR="${MOUNT_DIR}/claude-memories"
-seed_memory() {
-  local dest="${MEMORIES_DIR}/$1"
-  if [[ ! -f "${dest}" ]]; then
-    cat > "${dest}"
-    echo "    Seeded: $1"
-  else
-    echo "    Already exists (skipped): $1"
-  fi
-}
+echo "==> Migrating existing memory-agent data into shared-context (if present)"
+if [[ -d "${MEMORY_AGENT_DATA_OLD}" ]] && [[ -n "$(ls -A "${MEMORY_AGENT_DATA_OLD}" 2>/dev/null)" ]]; then
+  rsync -a "${MEMORY_AGENT_DATA_OLD}/" "${MOUNT_DIR}/memory-agent/"
+  echo "    Migrated $(du -sh "${MEMORY_AGENT_DATA_OLD}" | cut -f1) of existing memory-agent data."
+fi
 
-seed_memory "oracle-ssh-keys.md" <<'SSHEOF'
-# SJL Oracle SSH Key Layout
-
-## Status
-Recorded from ChatGPT session — paths and fingerprints have not been
-independently revalidated via live filesystem inspection.
-
-## Primary Oracle VM SSH Key
-| Field | Value |
-|---|---|
-| Private key | `/home/sjl/.ssh/id_ed25519_oracle` |
-| Public key | `/home/sjl/.ssh/id_ed25519_oracle.pub` |
-| Fingerprint | `SHA256:hWCObgU2s333ojLvYqqzW+gy/I1kXMF8WkUdMcMMOVQ` |
-| Host | `100.67.229.94` (sOs Tailscale IP) |
-| User | `ubuntu` |
-
-SSH command: `ssh -i /home/sjl/.ssh/id_ed25519_oracle ubuntu@100.67.229.94`
-
-## SJL Unified Cloud MCP SSH Bridge Key
-| Field | Value |
-|---|---|
-| Private key | `/opt/secrets/oracle/id_rsa` |
-| Fingerprint | `SHA256:huNcak2mC88jm7JPxtWYnkLsPNbUxgs9rrQQAJ5zE5I` |
-| Purpose | SSH bridge used by the SJL Unified Cloud MCP connector |
-
-## OCI API Key (not an SSH key)
-Used for Oracle Cloud Infrastructure API requests only.
-Commonly named `oci_api_key.pem`. Cannot substitute for SSH login.
-
-## Recommended SSH Config Entry
-```
-Host oracle-sjl
-    HostName 100.67.229.94
-    User ubuntu
-    IdentityFile /home/sjl/.ssh/id_ed25519_oracle
-    IdentitiesOnly yes
-```
-Connect with: `ssh oracle-sjl`
-
-## Security Notes
-- Never place private-key contents in docs, chat, source control, or BookStack
-- Store only paths, public fingerprints, host aliases, rotation metadata
-- chmod 600 <private-key> always
-- Verify fingerprint: ssh-keygen -lf <public-key-path>
-- Root SSH login must stay disabled; connect as ubuntu or sjl, elevate with sudo
-SSHEOF
+echo "==> Repointing memory-agent Quadlet volume at shared-context"
+QUADLET_FILE="${QUADLET_DIR}/memory-agent.container"
+if [[ -f "${QUADLET_FILE}" ]]; then
+  sed -i "s#Volume=.*:/memories:Z#Volume=${MOUNT_DIR}/memory-agent:/memories:Z#" "${QUADLET_FILE}"
+  systemctl daemon-reload
+  systemctl restart memory-agent.service || echo "    WARNING: memory-agent.service restart failed — check journalctl -u memory-agent"
+  echo "    memory-agent Quadlet updated and restarted."
+else
+  echo "    NOTE: ${QUADLET_FILE} not found — skipping (deploy memory-agent first if you haven't)."
+fi
 
 echo ""
 echo "==> Done. Shared context is live at ${MOUNT_DIR} (real data: ${REAL_DIR})"

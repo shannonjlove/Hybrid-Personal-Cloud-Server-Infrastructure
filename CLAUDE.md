@@ -18,52 +18,94 @@ All nodes connected via **Tailscale** mesh VPN. All services under `*.shannonjlo
 2. **Nginx Proxy Manager only.** NPM handles all reverse proxy + SSL. Never Traefik, never Caddy. Delete any `traefik.*` labels on sight.
 3. **No `ai-memory` binary.** Do not install `alphaonedev/ai-memory-mcp` — unverified, pulled via `curl | sh`, out of scope permanently.
 4. **No secrets in the repo.** `.env` is gitignored. `env.template` (no leading dot) committed with placeholders only.
-5. **No Anthropic API key required.** The memory stack is fully local — no external API calls.
+5. **No Anthropic API key required.** The entire memory stack is fully local — no external API calls, no per-request cost. If you ever see `ANTHROPIC_API_KEY` being re-introduced, that's a regression — stop and flag it.
+6. **`memory.shannonjlove.cloud` is Tailscale-restricted, not public.** NPM access list allows only `100.64.0.0/10`. Do not remove this restriction.
 
 ## Architecture
 
 ```
 Nexus (100.115.66.75, public 72.61.74.250)
-  ├── /opt/shared-context  -> bind-mounted to /mnt/shared-context -> exported via NFS
-  │                           (Tailscale subnet 100.64.0.0/10 ONLY)
-  ├── claude-memory  stdio MCP server (no container), MEMORY_ROOT=/mnt/shared-context/claude-memories
-  └── NPM            Reverse proxy + SSL for all public services
+  ├── memory-agent (v2)   Plain REST CRUD over /memories. No model calls,
+  │                       no external API, no cost. Podman Quadlet, port 8100,
+  │                       Tailscale-bound. Storage: /mnt/shared-context/memory-agent/
+  │
+  ├── local-agent         Ollama-backed /chat (natural language memory reasoning).
+  │                       Zero cost, zero vendor lock-in. Podman Quadlet, port 8101,
+  │                       Tailscale-only. Model: qwen2.5:7b (swappable via OLLAMA_MODEL)
+  │
+  ├── /opt/shared-context -> bind-mounted to /mnt/shared-context -> NFS-exported
+  │                          (Tailscale subnet 100.64.0.0/10 ONLY)
+  │
+  ├── claude-memory       stdio MCP server (no container), MEMORY_ROOT=/mnt/shared-context/claude-memories
+  │
+  └── NPM                 Reverse proxy + SSL
+                          https://memory.shannonjlove.cloud -> 100.115.66.75:8100 (Tailscale-restricted)
 
 sOs (100.67.229.94)
   ├── /mnt/shared-context  NFS-mounted from Nexus, same absolute path
-  ├── claude-memory  Same stdio MCP server, same shared MEMORY_ROOT
-  └── WebTop         Podman Quadlet, lscr.io/linuxserver/webtop:ubuntu-xfce
-                     Always-on. Bind-mounts /mnt/shared-context at same path inside container.
+  ├── claude-memory        Same stdio MCP server, same shared MEMORY_ROOT
+  └── WebTop               Podman Quadlet, lscr.io/linuxserver/webtop:ubuntu-xfce
+                           Always-on. Bind-mounts /mnt/shared-context at same path inside container.
 ```
 
-## Memory tool — claude-memory (free, no API key)
+## Memory tools
 
+**claude-memory** (on all nodes, no API key)
 - stdio MCP server at `~/.local/lib/claude-memory/server.py`
-- Implements the Anthropic `memory_20250818` protocol (view/create/edit/delete file ops)
+- Implements the Anthropic `memory_20250818` protocol (view/create/str_replace/insert/delete/rename)
 - **MEMORY_ROOT = `/mnt/shared-context/claude-memories`** (shared via NFS — same files on all nodes)
 - **Always `view /memories` at the start of every session** to recover prior context
-- Zero API calls — Claude Code itself decides what to remember, the server just does file I/O
+- Zero API calls — pure file I/O
 
-## Deployment (two commands total)
+**memory-agent v2** (Nexus only, Tailscale port 8100)
+- FastAPI REST CRUD service over `/memories`
+- NO model calls, NO Anthropic API key, NO cost — plain file I/O with an HTTP front door
+- Source: `02-CONTAINERS/ai-mcp-servers/memory-agent/`
+
+**local-agent** (Nexus only, Tailscale port 8101, not public)
+- Recovers natural-language memory reasoning using local Ollama (qwen2.5:7b by default)
+- Talks to memory-agent's REST API as its tools — no duplicate file-safety logic
+- Source: `02-CONTAINERS/ai-mcp-servers/local-agent/`
+
+## Deployment order (Nexus first, then sOs)
 
 ```bash
-# On Nexus:
+# On Nexus — Step 0: memory-agent v2 (no API key, pure file CRUD)
+bash scripts/deploy-memory-agent-v2.sh
+
+# On Nexus — Step 0b: local-agent (Ollama-backed, free)
+# Prerequisite: Ollama running + ollama pull qwen2.5:7b
+bash scripts/deploy-local-agent.sh
+
+# On Nexus — Step 1: shared context NFS + claude-memory
 bash scripts/deploy-shared-context-nexus.sh
 
-# On sOs (after Nexus finishes):
+# On sOs (after Nexus Step 1 completes) — Step 2
 bash scripts/deploy-shared-context-sos-webtop.sh
+
+# On Nexus — Step 3: NPM proxy host for memory.shannonjlove.cloud
+# Prerequisite: .env with NPM_EMAIL / NPM_PASSWORD / NPM_URL
+bash scripts/configure-npm-memory.sh
 ```
 
 ## Key directories
 
 ```
 02-CONTAINERS/ai-mcp-servers/
-  claude-memory/server.py          <- Anthropic memory_20250818 stdio MCP server
-  claude-memory/seed-memories/     <- infrastructure-rules.md seeded to MEMORY_ROOT on install
-01-DEPLOYMENT/oracle/quadlets/     <- sOs quadlet unit files (webtop)
+  claude-memory/server.py          <- stdio MCP server (memory_20250818 protocol)
+  claude-memory/seed-memories/     <- seeded into MEMORY_ROOT on install
+  memory-agent/                    <- FastAPI file CRUD (v2, no API key)
+  local-agent/                     <- Ollama-backed /chat service
+01-DEPLOYMENT/hostinger/quadlets/  <- Nexus Quadlet unit files
+  memory-agent.container
+  local-agent.container
+01-DEPLOYMENT/oracle/quadlets/     <- sOs Quadlet unit files (webtop)
 scripts/
-  deploy-shared-context-nexus.sh   <- Nexus: NFS export + claude-memory install
-  deploy-shared-context-sos-webtop.sh <- sOs: NFS mount + WebTop Quadlet
+  deploy-memory-agent-v2.sh
+  deploy-local-agent.sh
+  deploy-shared-context-nexus.sh
+  deploy-shared-context-sos-webtop.sh
+  configure-npm-memory.sh
 ios/scriptable/                    <- iPhone Scriptable JS files
 .claude/settings.json              <- Claude Code MCP config
 ```
@@ -75,10 +117,12 @@ ios/scriptable/                    <- iPhone Scriptable JS files
 
 ## DNS
 - Wildcard `*` A -> `72.61.74.250` covers ALL `*.shannonjlove.cloud` — no new DNS records needed
+- `memory.shannonjlove.cloud` resolves already (wildcard), only the NPM proxy host was missing
 
 ## Security rules
 - No secrets, keys, tokens, or credentials in this repo (enforced by `.gitignore`)
 - NFS exported to Tailscale subnet only — never bind to a public interface
+- `memory.shannonjlove.cloud` Tailscale-restricted via NPM access list — do not remove
 - Destructive/public actions require approval per `06-OPS/approvals/POLICY.md`
 - Memory files may contain session context but never credentials
 
