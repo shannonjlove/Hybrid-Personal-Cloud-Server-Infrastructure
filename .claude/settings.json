@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "claude-memory": {
+      "command": "python3",
+      "args": ["${HOME}/.local/lib/claude-memory/server.py"],
+      "env": {
+        "MEMORY_ROOT": "/mnt/shared-context/claude-memories"
+      }
+    }
+  }
+}
