@@ -1,0 +1,6 @@
+# Paperless-NGX is deployed via Podman Quadlets — NOT Docker Compose.
+# See: quadlets/  for the unit files.
+# See: scripts/deploy.sh for the installation procedure.
+#
+# Traefik (Docker) routes to Paperless via the file provider:
+# See: ../../02-CONTAINERS/traefik/dynamic/paperless.yml

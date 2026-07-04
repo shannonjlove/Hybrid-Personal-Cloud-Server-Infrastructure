@@ -1,0 +1,6 @@
+# Podman Quadlet — persistent volume for PostgreSQL data
+# Install to: /etc/containers/systemd/paperless-pgdata.volume
+
+[Volume]
+VolumeName=paperless-pgdata
+Label=app=paperless

@@ -1,0 +1,44 @@
+# Podman Quadlet — Paperless-NGX main application
+# Install to: /etc/containers/systemd/paperless.container
+# Manages:    paperless.service
+#
+# Traefik (Docker) routes to this service via the file provider.
+# See: 02-CONTAINERS/traefik/dynamic/paperless.yml
+# Port 8000 is published on the host; Traefik reaches it via host.docker.internal.
+
+[Unit]
+Description=Paperless-NGX document management
+After=network-online.target paperless-network.service
+After=paperless-broker.service paperless-db.service
+After=paperless-gotenberg.service paperless-tika.service
+Requires=paperless-broker.service paperless-db.service
+
+[Container]
+Image=ghcr.io/paperless-ngx/paperless-ngx:latest
+ContainerName=paperless
+Network=paperless.network
+
+# Bind mounts — owner must match USERMAP_UID/GID in env file
+Volume=/opt/paperless/data:/usr/src/paperless/data:Z
+Volume=/opt/paperless/media:/usr/src/paperless/media:Z
+Volume=/opt/paperless/export:/usr/src/paperless/export:Z
+Volume=/opt/paperless/consume:/usr/src/paperless/consume:Z
+
+# All config via env file — see .env.example for required keys
+EnvironmentFile=/etc/paperless/paperless.env
+
+# Published on loopback + Docker bridge so Traefik can reach it.
+# Hostinger firewall should block 8000 from public internet.
+PublishPort=8000:8000
+
+Label=app=paperless
+
+[Service]
+Restart=always
+TimeoutStartSec=300
+# Run migrations automatically on start
+ExecStartPost=sleep 5
+ExecStartPost=podman exec paperless python manage.py migrate --no-input
+
+[Install]
+WantedBy=multi-user.target default.target

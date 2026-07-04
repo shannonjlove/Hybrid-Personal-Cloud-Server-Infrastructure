@@ -1,0 +1,27 @@
+# Podman Quadlet — Gotenberg document conversion service
+# Install to: /etc/containers/systemd/paperless-gotenberg.container
+# Manages:    paperless-gotenberg.service
+
+[Unit]
+Description=Paperless Gotenberg (document conversion)
+After=network-online.target paperless-network.service
+Requires=paperless-network.service
+
+[Container]
+Image=docker.io/gotenberg/gotenberg:8
+ContainerName=paperless-gotenberg
+Network=paperless.network
+# Exec= sets the CMD passed to the image's ENTRYPOINT (gotenberg binary)
+Exec=--chromium-disable-javascript=true --chromium-allow-list=file:///tmp/.*
+HealthCmd=curl -sf http://localhost:3000/health
+HealthInterval=30s
+HealthRetries=3
+HealthTimeout=10s
+Label=app=paperless
+
+[Service]
+Restart=always
+TimeoutStartSec=120
+
+[Install]
+WantedBy=multi-user.target default.target

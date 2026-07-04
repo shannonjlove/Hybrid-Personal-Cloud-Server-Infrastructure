@@ -1,0 +1,29 @@
+# Podman Quadlet — PostgreSQL 16 document database
+# Install to: /etc/containers/systemd/paperless-db.container
+# Manages:    paperless-db.service
+#
+# Reads POSTGRES_DB / POSTGRES_USER / POSTGRES_PASSWORD from EnvironmentFile.
+
+[Unit]
+Description=Paperless Database (PostgreSQL 16)
+After=network-online.target paperless-network.service
+Requires=paperless-network.service
+
+[Container]
+Image=docker.io/postgres:16-alpine
+ContainerName=paperless-db
+Network=paperless.network
+Volume=paperless-pgdata.volume:/var/lib/postgresql/data:Z
+EnvironmentFile=/etc/paperless/paperless.env
+HealthCmd=pg_isready -U paperless
+HealthInterval=30s
+HealthRetries=5
+HealthTimeout=10s
+Label=app=paperless
+
+[Service]
+Restart=always
+TimeoutStartSec=120
+
+[Install]
+WantedBy=multi-user.target default.target

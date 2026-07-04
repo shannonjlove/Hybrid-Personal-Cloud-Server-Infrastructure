@@ -27,6 +27,10 @@ services:
       - ./02-CONTAINERS/traefik/traefik.yml:/etc/traefik/traefik.yml:ro
       - ./02-CONTAINERS/traefik/dynamic:/etc/traefik/dynamic:ro
       - traefik-certs:/letsencrypt
+    # Allows Traefik to reach Podman-managed containers (e.g. Paperless-NGX)
+    # via host.docker.internal — see 02-CONTAINERS/traefik/dynamic/paperless.yml
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     labels:
       - "traefik.enable=true"
 

@@ -1,0 +1,8 @@
+# Podman Quadlet — internal network for all Paperless services
+# Install to: /etc/containers/systemd/paperless.network
+# Generates:  paperless-network.service
+
+[Network]
+NetworkName=paperless
+Driver=bridge
+Label=app=paperless

@@ -5,9 +5,19 @@
 ### Hostinger VPS — Nexus Server
 - **Role**: Primary container host
 - **URL**: nexus.shannonjlove.cloud
-- **Reverse Proxy**: Traefik
-- **Containers**: Paperless-ngx, PhotoPrism, Jellyfin, BookStack, and more
+- **Reverse Proxy**: Traefik (Docker) — routes to both Docker containers and Podman services
+- **Docker containers**: PhotoPrism, BookStack
+- **Podman Quadlets (systemd)**: Paperless-NGX (+ broker, db, gotenberg, tika)
 - **Admin**: admin.shannonjlove.cloud
+
+#### Services
+
+| Service | URL | Runtime | Notes |
+|---------|-----|---------|-------|
+| Paperless-NGX | paperless.shannonjlove.cloud | Podman Quadlet | Document archive, PARA-tagged |
+| BookStack | docs.shannonjlove.cloud | Docker | Knowledge base |
+| PhotoPrism | photos.shannonjlove.cloud | Docker | Photo management |
+| Traefik | — | Docker | Reverse proxy + SSL (Let's Encrypt) |
 
 ### Oracle Cloud — sOs Instance
 - **Role**: ARM compute, secondary workloads
@@ -36,7 +46,9 @@ All servers connected via Tailscale mesh VPN (5 devices):
 ## Domain Architecture
 
 All services use `shannonjlove.cloud` with subdomains:
+- `paperless.shannonjlove.cloud` — Paperless-NGX document archive
 - `docs.shannonjlove.cloud` — BookStack
+- `photos.shannonjlove.cloud` — PhotoPrism
 - `admin.shannonjlove.cloud` — Admin panel
 - `nexus.shannonjlove.cloud` — Nexus VPS
 
