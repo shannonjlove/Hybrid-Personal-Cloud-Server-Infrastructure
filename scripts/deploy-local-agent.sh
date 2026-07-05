@@ -277,7 +277,7 @@ WantedBy=multi-user.target
 EOF
 
 systemctl daemon-reload
-systemctl enable --now local-agent.service
+systemctl start local-agent.service
 
 sleep 3
 echo "==> Service status"

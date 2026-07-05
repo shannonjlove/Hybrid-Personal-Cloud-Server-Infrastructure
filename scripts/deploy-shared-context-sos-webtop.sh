@@ -311,7 +311,7 @@ WantedBy=multi-user.target
 EOF
 
 systemctl daemon-reload
-systemctl enable --now webtop.service
+systemctl start webtop.service
 
 sleep 3
 echo "==> WebTop service status"

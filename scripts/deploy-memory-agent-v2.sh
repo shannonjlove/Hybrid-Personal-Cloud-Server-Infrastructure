@@ -255,7 +255,7 @@ EOF
 #   systemctl daemon-reload && systemctl restart memory-agent
 
 systemctl daemon-reload
-systemctl enable --now memory-agent.service
+systemctl start memory-agent.service
 
 sleep 3
 echo "==> Service status"
