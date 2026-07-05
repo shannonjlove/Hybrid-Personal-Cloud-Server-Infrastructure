@@ -62,12 +62,15 @@ echo "    OK — memory-agent is healthy."
 # Authenticate with NPM
 # -----------------------------------------------------------------------------
 echo "==> Authenticating with NPM (${NPM_URL})..."
-AUTH=$(curl -sf -X POST "${NPM_URL}/api/tokens" \
+AUTH=$(curl -s --max-time 10 -X POST "${NPM_URL}/api/tokens" \
   -H "Content-Type: application/json" \
-  -d "{\"identity\":\"${NPM_EMAIL}\",\"secret\":\"${NPM_PASSWORD}\"}")
-TOKEN=$(echo "${AUTH}" | jq -r '.token // empty')
+  -d "{\"identity\":\"${NPM_EMAIL}\",\"secret\":\"${NPM_PASSWORD}\"}" 2>&1) || true
+TOKEN=$(echo "${AUTH}" | jq -r '.token // empty' 2>/dev/null || true)
 if [[ -z "${TOKEN}" ]]; then
-  echo "ERROR: NPM authentication failed. Check NPM_EMAIL / NPM_PASSWORD."
+  echo "ERROR: NPM authentication failed."
+  echo "  URL:      ${NPM_URL}"
+  echo "  Email:    ${NPM_EMAIL}"
+  echo "  Response: ${AUTH}"
   exit 1
 fi
 
