@@ -30,7 +30,7 @@ for candidate in "./.env" "../.env"; do
   fi
 done
 
-NPM_URL="${NPM_URL:-http://shannonjlove.tail179603.ts.net:81}"
+NPM_URL="${NPM_URL:-http://localhost:81}"
 NPM_EMAIL="${NPM_EMAIL:-shannonjlove@mac.com}"
 
 if [[ -z "${NPM_PASSWORD:-}" ]]; then
