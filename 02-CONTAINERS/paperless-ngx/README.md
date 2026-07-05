@@ -52,9 +52,9 @@ sudo 02-CONTAINERS/paperless-ngx/scripts/create-superuser.sh
 # Seed PARA tags, document types, and correspondents
 sudo 02-CONTAINERS/paperless-ngx/scripts/seed-para-tags.sh
 
-# Restart Traefik to pick up the file provider config
-cd /path/to/docker-compose
-docker compose restart traefik
+# NPM proxy host is configured automatically by setup-proxy-hosts.sh
+# If needed, restart NPM:
+systemctl restart nginx-proxy-manager.service
 ```
 
 ---

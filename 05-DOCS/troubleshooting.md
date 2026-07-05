@@ -31,13 +31,13 @@ Common issues and resolution steps for the hybrid cloud infrastructure.
 ## Docker / Container Issues
 
 ### Container not starting
-1. Check logs: `docker logs <container_name>`
-2. Verify docker-compose.yml syntax
+1. Check logs: `journalctl -u <service>.service -f`
+2. Check container status: `podman ps -a`
 3. Check available disk space: `df -h`
-4. Review port conflicts: `docker ps`
+4. Review port conflicts: `podman ps`
 
-### Traefik not routing
-1. Verify Docker labels on container
+### NPM not routing
+1. Verify the container is on the `infra` Podman network: `podman network inspect infra`
 2. Check Traefik dynamic configuration
 3. Restart Traefik: `docker restart traefik`
 
