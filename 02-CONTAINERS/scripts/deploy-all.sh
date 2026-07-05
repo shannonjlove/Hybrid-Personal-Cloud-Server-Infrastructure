@@ -138,8 +138,7 @@ done
 
 echo ""
 echo "==> Configuring NPM proxy hosts + Let's Encrypt SSL..."
-echo "    (Uses NPM default credentials — change them in NPM_EMAIL / NPM_PASSWORD"
-echo "     if you've already updated the admin account.)"
+echo "    (Login: shannonjlove@mac.com — pass NPM_PASSWORD=<your-password> if needed)"
 
 SETUP_SCRIPT="$REPO/02-CONTAINERS/nginx-proxy-manager/scripts/setup-proxy-hosts.sh"
 if [ -f "$SETUP_SCRIPT" ]; then

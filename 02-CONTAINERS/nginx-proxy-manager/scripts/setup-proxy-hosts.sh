@@ -13,7 +13,7 @@
 set -euo pipefail
 
 NPM_URL="${NPM_URL:-http://localhost:81}"
-NPM_EMAIL="${NPM_EMAIL:-admin@example.com}"
+NPM_EMAIL="${NPM_EMAIL:-shannonjlove@mac.com}"
 NPM_PASSWORD="${NPM_PASSWORD:-changeme}"
 LE_EMAIL="${LE_EMAIL:-sjlove@shannonjeffreylove.com}"
 
