@@ -40,6 +40,7 @@ else
 fi
 
 echo "==> Installing claude-memory stdio MCP server"
+apt-get install -y --no-install-recommends python3-venv python3-full 2>/dev/null || true
 mkdir -p "${CLAUDE_MEMORY_LIB}"
 cat > "${CLAUDE_MEMORY_LIB}/server.py" <<'PYEOF'
 #!/usr/bin/env python3
