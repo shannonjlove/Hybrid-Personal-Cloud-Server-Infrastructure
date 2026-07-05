@@ -11,7 +11,19 @@ if [[ $EUID -ne 0 ]]; then
   exit 1
 fi
 
-REPO="$(cd "$(dirname "$0")/.." && pwd)"
+# REPO can be overridden: REPO=/path/to/repo bash deploy-all.sh
+# Auto-detect: script lives at <REPO>/02-CONTAINERS/scripts/deploy-all.sh
+_SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO="${REPO:-$(cd "$_SCRIPT_DIR/../.." && pwd)}"
+
+# Sanity check — if REPO doesn't look right, abort early
+if [[ ! -d "$REPO/02-CONTAINERS" ]]; then
+  echo "ERROR: Cannot find 02-CONTAINERS/ under REPO=$REPO"
+  echo "  Run the script from inside the cloned repo, or set REPO explicitly:"
+  echo "  REPO=/opt/infra bash $0"
+  exit 1
+fi
+
 DEST="/etc/containers/systemd"
 
 echo "==> Checking Podman..."
@@ -98,7 +110,7 @@ podman pull docker.io/photoprism/photoprism:latest
 podman pull docker.io/valkey/valkey:8
 podman pull docker.io/postgres:16-alpine
 podman pull docker.io/gotenberg/gotenberg:8
-podman pull ghcr.io/paperless-ngx/tika:latest
+podman pull docker.io/apache/tika:latest
 podman pull ghcr.io/paperless-ngx/paperless-ngx:latest
 
 # ── 6. Start services ─────────────────────────────────────────────────────────

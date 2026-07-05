@@ -8,7 +8,7 @@ After=network-online.target paperless-network.service
 Requires=paperless-network.service
 
 [Container]
-Image=ghcr.io/paperless-ngx/tika:latest
+Image=docker.io/apache/tika:latest
 ContainerName=paperless-tika
 Network=paperless.network
 HealthCmd=curl -sf http://localhost:9998/tika
