@@ -324,11 +324,9 @@ if __name__ == "__main__":
 
 PYEOF
 
-if command -v pip3 &>/dev/null; then
-  pip3 install --quiet --user "mcp[cli]>=1.0.0"
-else
-  echo "    WARNING: pip3 not found. Run: pip3 install 'mcp[cli]>=1.0.0'"
-fi
+echo "==> Creating Python venv for claude-memory and installing mcp"
+python3 -m venv "${CLAUDE_MEMORY_LIB}/venv"
+"${CLAUDE_MEMORY_LIB}/venv/bin/pip" install --quiet "mcp[cli]>=1.0.0"
 
 echo "==> Writing/merging .claude/settings.json (project-local, adjust path if needed)"
 CLAUDE_SETTINGS_DIR="${HOME}/.claude"
@@ -337,7 +335,7 @@ cat > "${CLAUDE_SETTINGS_DIR}/settings.json" <<EOF
 {
   "mcpServers": {
     "claude-memory": {
-      "command": "python3",
+      "command": "${CLAUDE_MEMORY_LIB}/venv/bin/python3",
       "args": ["${CLAUDE_MEMORY_LIB}/server.py"],
       "env": {
         "MEMORY_ROOT": "${MOUNT_DIR}/claude-memories"

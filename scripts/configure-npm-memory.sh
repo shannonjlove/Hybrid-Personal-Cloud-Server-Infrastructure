@@ -31,9 +31,14 @@ for candidate in "./.env" "../.env"; do
 done
 
 NPM_URL="${NPM_URL:-http://shannonjlove.tail179603.ts.net:81}"
+NPM_EMAIL="${NPM_EMAIL:-shannonjlove@mac.com}"
 
-if [[ -z "${NPM_EMAIL:-}" || -z "${NPM_PASSWORD:-}" ]]; then
-  echo "ERROR: NPM_EMAIL and NPM_PASSWORD must be set (via .env or environment)."
+if [[ -z "${NPM_PASSWORD:-}" ]]; then
+  read -r -s -p "NPM Password for ${NPM_EMAIL}: " NPM_PASSWORD
+  echo
+fi
+if [[ -z "${NPM_PASSWORD:-}" ]]; then
+  echo "ERROR: NPM_PASSWORD must be set."
   exit 1
 fi
 

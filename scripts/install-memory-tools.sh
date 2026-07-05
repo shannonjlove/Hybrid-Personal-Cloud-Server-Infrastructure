@@ -1,30 +1,29 @@
 #!/usr/bin/env bash
 # =============================================================================
 # install-memory-tools.sh
-# Reference for run order. Execute each script manually in order — do not
-# source this file directly as some steps have prerequisites.
+# Run this script directly on Nexus to deploy the full memory platform.
+# It pulls the latest code first, then runs each step in order.
 #
-# RUN ORDER (all on Nexus unless noted):
-#   Step 0:  bash scripts/deploy-memory-agent-v2.sh
-#              Deploys memory-agent v2 (plain file CRUD REST API, no API key)
-#   Step 0b: bash scripts/deploy-local-agent.sh
-#              Deploys local-agent (Ollama-backed /chat, zero cost)
-#              Prerequisite: Ollama running + ollama pull qwen2.5:7b
-#   Step 1:  bash scripts/deploy-shared-context-nexus.sh
-#              NFS export, claude-memory, repoints memory-agent volume
-#   Step 2:  (on sOs) bash scripts/deploy-shared-context-sos-webtop.sh
-#              NFS mount, claude-memory, WebTop Quadlet
-#   Step 3:  bash scripts/configure-npm-memory.sh
-#              NPM proxy host for memory.shannonjlove.cloud (Tailscale-only)
-#              Prerequisite: .env with NPM_EMAIL/NPM_PASSWORD/NPM_URL
+# On sOs (ARM64), run manually after this completes:
+#   bash scripts/deploy-shared-context-sos-webtop.sh
 # =============================================================================
-echo "This script is a reference — run each step script individually."
+set -euo pipefail
+cd "$(git rev-parse --show-toplevel)"
+
+echo "==> Pulling latest from main"
+git pull origin main
+
 echo ""
-echo "On Nexus (x86_64):"
-echo "  bash scripts/deploy-memory-agent-v2.sh"
-echo "  bash scripts/deploy-local-agent.sh       # requires Ollama + qwen2.5:7b"
-echo "  bash scripts/deploy-shared-context-nexus.sh"
-echo "  bash scripts/configure-npm-memory.sh      # requires .env with NPM creds"
+echo "==> Step 0: Deploy memory-agent v2"
+bash scripts/deploy-memory-agent-v2.sh
+
 echo ""
-echo "On sOs (ARM64), after Nexus completes:"
-echo "  bash scripts/deploy-shared-context-sos-webtop.sh"
+echo "==> Step 1: Deploy shared context + claude-memory (NFS, venv)"
+bash scripts/deploy-shared-context-nexus.sh
+
+echo ""
+echo "==> Step 3: Configure NPM proxy host for memory.shannonjlove.cloud"
+bash scripts/configure-npm-memory.sh
+
+echo ""
+echo "Done. On sOs, run: bash scripts/deploy-shared-context-sos-webtop.sh"
