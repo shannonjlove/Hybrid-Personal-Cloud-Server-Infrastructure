@@ -119,23 +119,23 @@ echo ""
 echo "==> Starting services..."
 
 # NPM first — it's the gateway
-systemctl enable --now nginx-proxy-manager.service
+systemctl start nginx-proxy-manager.service
 echo "  NPM started. Admin UI: http://$(hostname -I | awk '{print $1}'):81"
 
 # BookStack
-systemctl enable --now bookstack-db.service
+systemctl start bookstack-db.service
 sleep 10
-systemctl enable --now bookstack.service
+systemctl start bookstack.service
 
 # PhotoPrism
-systemctl enable --now photoprism.service
+systemctl start photoprism.service
 
 # Paperless (deps first)
-systemctl enable --now paperless-broker.service paperless-db.service
+systemctl start paperless-broker.service paperless-db.service
 sleep 15
-systemctl enable --now paperless-gotenberg.service paperless-tika.service
+systemctl start paperless-gotenberg.service paperless-tika.service
 sleep 5
-systemctl enable --now paperless.service
+systemctl start paperless.service
 
 # ── 7. Status ─────────────────────────────────────────────────────────────────
 
