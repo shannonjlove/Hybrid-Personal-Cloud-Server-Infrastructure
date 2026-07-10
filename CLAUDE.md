@@ -88,6 +88,21 @@ bash scripts/deploy-shared-context-sos-webtop.sh
 bash scripts/configure-npm-memory.sh
 ```
 
+## Claude skill — /memory-workflow
+
+`.claude/memory-workflow.md` is a Claude Code skill. Invoke it with `/memory-workflow` or trigger it automatically with phrases like:
+
+> "remember this" · "check memory" · "what do we know about X" · "save this to memory" · "update the infra notes" · "what's in /memories"
+
+**At the start of every session on any node, run this before asking Shannon to re-explain anything:**
+```
+memory(command='view', path='/memories')
+```
+
+The skill covers: MCP tool vs REST API decision logic, all six MCP commands, all REST endpoints with curl examples, file organization conventions, access matrix, and security boundaries. Read it before touching memory if anything is unclear.
+
+**Memory file naming:** Files are named by topic (`infra/nexus.md`), not by timestamp. The `YYYY-MM-DD_HH-MM_category_UUID` convention used elsewhere does NOT apply here — memory files are living documents, not point-in-time artifacts. Write once, update in place with `str_replace`.
+
 ## Key directories
 
 ```
@@ -101,18 +116,47 @@ bash scripts/configure-npm-memory.sh
   local-agent.container
 01-DEPLOYMENT/oracle/quadlets/     <- sOs Quadlet unit files (webtop)
 scripts/
+  install-memory-tools.sh          <- ONE-SHOT: runs all Nexus steps in order (pull + deploy)
   deploy-memory-agent-v2.sh
   deploy-local-agent.sh
   deploy-shared-context-nexus.sh
   deploy-shared-context-sos-webtop.sh
   configure-npm-memory.sh
+05-DOCS/
+  HANDOFF-memory-usage-workflow.md <- full memory usage reference (also at artifact link)
 ios/scriptable/                    <- iPhone Scriptable JS files
-.claude/settings.json              <- Claude Code MCP config
+.claude/
+  settings.json                    <- Claude Code MCP config (claude-memory server entry)
+  memory-workflow.md               <- /memory-workflow Claude skill
 ```
+
+## Deployment gotchas (learned in practice)
+
+**Podman Quadlet systemctl:** Never use `systemctl enable --now <quadlet>.service` — Quadlet units are generated at runtime and `enable --now` fails with "unit is transient or generated". Always use:
+```bash
+systemctl daemon-reload
+systemctl start <service>.service
+```
+NFS (`nfs-kernel-server`) is a real service and CAN use `enable --now`. Quadlets cannot.
+
+**Python venv on Ubuntu 24.04:** `pip3 install --user` is blocked by PEP 668 ("externally managed environment"). Always create a venv first:
+```bash
+apt-get install -y python3-venv python3-full
+python3 -m venv ~/.local/lib/claude-memory/venv
+~/.local/lib/claude-memory/venv/bin/pip install "mcp[cli]>=1.0.0"
+```
+The `settings.json` `command` field must point to the venv python, not the system python.
+
+**NPM URL from Nexus:** NPM runs on Nexus itself. When running `configure-npm-memory.sh` on Nexus, use `http://localhost:81` — not the Tailscale hostname (`shannonjlove.tail179603.ts.net:81`), which may not be reachable from the same host due to NAT hairpin.
+
+**Repo directory:** All scripts use `git rev-parse --show-toplevel` or assume they're run from the repo root. Always `cd ~/Hybrid-Personal-Cloud-Server-Infrastructure` before running any script.
+
+**sOs needs sudo:** `ubuntu` user on Oracle Cloud requires `sudo bash scripts/deploy-shared-context-sos-webtop.sh` for systemctl and apt operations.
 
 ## NPM access
 - Public: `https://npm.shannonjlove.cloud`
 - Tailscale: `http://shannonjlove.tail179603.ts.net:81`
+- Local (from Nexus): `http://localhost:81`
 - Credentials in `.env` on each server (gitignored)
 
 ## DNS
