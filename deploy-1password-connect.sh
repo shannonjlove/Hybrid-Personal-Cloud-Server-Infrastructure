@@ -1,11 +1,24 @@
 #!/bin/bash
 # Deploy 1Password Connect as Podman Quadlets on Nexus
-# Usage: bash deploy-1password-connect.sh [--skip-credentials-copy]
+# Usage: bash deploy-1password-connect.sh [credentials-file] [--skip-credentials-copy]
 
 set -e
 
-CREDENTIALS_FILE="${1:-1password-credentials.json}"
-SKIP_COPY="${2:-}"
+# Get the directory where this script is located
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Parse arguments robustly
+SKIP_COPY=""
+CREDENTIALS_FILE="1password-credentials.json"
+
+if [[ "$1" == "--skip-credentials-copy" ]]; then
+    SKIP_COPY="--skip-credentials-copy"
+elif [[ -n "$1" ]]; then
+    CREDENTIALS_FILE="$1"
+    if [[ "$2" == "--skip-credentials-copy" ]]; then
+        SKIP_COPY="--skip-credentials-copy"
+    fi
+fi
 
 echo "🔐 1Password Connect Podman Quadlet Deployment"
 echo "================================================"
@@ -38,7 +51,7 @@ if [[ "$SKIP_COPY" != "--skip-credentials-copy" ]]; then
     fi
 
     echo "📋 Copying credentials file..."
-    cp "$CREDENTIALS_FILE" /opt/1password/
+    cp "$CREDENTIALS_FILE" /opt/1password/1password-credentials.json
     chmod 600 /opt/1password/1password-credentials.json
     chown 999:999 /opt/1password/1password-credentials.json
     echo "✅ Credentials file copied and secured"
@@ -46,10 +59,10 @@ else
     echo "⏭️  Skipping credentials copy (--skip-credentials-copy)"
 fi
 
-# Copy Quadlet files
+# Copy Quadlet files using absolute path
 echo "📦 Deploying Quadlet units..."
-cp 1password-connect-api.container /etc/containers/systemd/
-cp 1password-connect-sync.container /etc/containers/systemd/
+cp "$SCRIPT_DIR/1password-connect-api.container" /etc/containers/systemd/
+cp "$SCRIPT_DIR/1password-connect-sync.container" /etc/containers/systemd/
 echo "✅ Quadlet files deployed"
 
 # Reload systemd
