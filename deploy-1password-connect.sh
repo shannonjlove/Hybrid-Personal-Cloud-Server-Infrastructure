@@ -1,24 +1,17 @@
 #!/bin/bash
 # Deploy 1Password Connect as Podman Quadlets on Nexus
-# Usage: bash deploy-1password-connect.sh [credentials-file] [--skip-credentials-copy]
+# Usage: sudo bash /deploy1passwordconnect.sh
 
 set -e
 
-# Get the directory where this script is located
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Absolute paths to files
+CREDENTIALS_SRC="/1password-credentials.json"
+API_CONTAINER="/1passwordconnectapi.container"
+SYNC_CONTAINER="/1passwordconnectsync.container"
 
-# Parse arguments robustly
-SKIP_COPY=""
-CREDENTIALS_FILE="1password-credentials.json"
-
-if [[ "$1" == "--skip-credentials-copy" ]]; then
-    SKIP_COPY="--skip-credentials-copy"
-elif [[ -n "$1" ]]; then
-    CREDENTIALS_FILE="$1"
-    if [[ "$2" == "--skip-credentials-copy" ]]; then
-        SKIP_COPY="--skip-credentials-copy"
-    fi
-fi
+# Deployment destinations
+CREDENTIALS_DEST="/opt/1password/1password-credentials.json"
+QUADLET_DIR="/etc/containers/systemd"
 
 echo "🔐 1Password Connect Podman Quadlet Deployment"
 echo "================================================"
@@ -37,33 +30,43 @@ fi
 
 echo "✅ Podman found: $(podman --version)"
 
+# Verify source files exist
+echo "🔍 Verifying source files..."
+if [[ ! -f "$CREDENTIALS_SRC" ]]; then
+    echo "❌ Credentials file not found: $CREDENTIALS_SRC"
+    exit 1
+fi
+echo "✅ Found: $CREDENTIALS_SRC"
+
+if [[ ! -f "$API_CONTAINER" ]]; then
+    echo "❌ API container file not found: $API_CONTAINER"
+    exit 1
+fi
+echo "✅ Found: $API_CONTAINER"
+
+if [[ ! -f "$SYNC_CONTAINER" ]]; then
+    echo "❌ Sync container file not found: $SYNC_CONTAINER"
+    exit 1
+fi
+echo "✅ Found: $SYNC_CONTAINER"
+
 # Create data directory
 echo "📁 Creating /opt/1password/data directory..."
 mkdir -p /opt/1password/data
 chmod 755 /opt/1password
 
-# Copy credentials file if not skipped
-if [[ "$SKIP_COPY" != "--skip-credentials-copy" ]]; then
-    if [[ ! -f "$CREDENTIALS_FILE" ]]; then
-        echo "❌ Credentials file not found: $CREDENTIALS_FILE"
-        echo "   Please provide the path to 1password-credentials.json"
-        exit 1
-    fi
+# Copy credentials file
+echo "📋 Copying credentials file..."
+cp "$CREDENTIALS_SRC" "$CREDENTIALS_DEST"
+chmod 600 "$CREDENTIALS_DEST"
+chown 999:999 "$CREDENTIALS_DEST"
+echo "✅ Credentials file copied and secured at $CREDENTIALS_DEST"
 
-    echo "📋 Copying credentials file..."
-    cp "$CREDENTIALS_FILE" /opt/1password/1password-credentials.json
-    chmod 600 /opt/1password/1password-credentials.json
-    chown 999:999 /opt/1password/1password-credentials.json
-    echo "✅ Credentials file copied and secured"
-else
-    echo "⏭️  Skipping credentials copy (--skip-credentials-copy)"
-fi
-
-# Copy Quadlet files using absolute path
+# Copy Quadlet files
 echo "📦 Deploying Quadlet units..."
-cp "$SCRIPT_DIR/1password-connect-api.container" /etc/containers/systemd/
-cp "$SCRIPT_DIR/1password-connect-sync.container" /etc/containers/systemd/
-echo "✅ Quadlet files deployed"
+cp "$API_CONTAINER" "$QUADLET_DIR/1passwordconnectapi.container"
+cp "$SYNC_CONTAINER" "$QUADLET_DIR/1passwordconnectsync.container"
+echo "✅ Quadlet files deployed to $QUADLET_DIR"
 
 # Reload systemd
 echo "🔄 Reloading systemd..."
@@ -72,38 +75,39 @@ echo "✅ Systemd daemon reloaded"
 
 # Start services
 echo "🚀 Starting 1Password Connect services..."
-systemctl start 1password-connect-api.service
-systemctl start 1password-connect-sync.service
+systemctl start 1passwordconnectapi.service
+systemctl start 1passwordconnectsync.service
 echo "✅ Services started"
 
 # Verify services are running
 echo "🔍 Verifying services..."
 sleep 2
 
-if systemctl is-active --quiet 1password-connect-api.service; then
-    echo "✅ 1password-connect-api.service is running"
+if systemctl is-active --quiet 1passwordconnectapi.service; then
+    echo "✅ 1passwordconnectapi.service is running"
 else
-    echo "❌ 1password-connect-api.service failed to start"
-    journalctl -u 1password-connect-api.service -n 10 --no-pager
+    echo "❌ 1passwordconnectapi.service failed to start"
+    journalctl -u 1passwordconnectapi.service -n 10 --no-pager
     exit 1
 fi
 
-if systemctl is-active --quiet 1password-connect-sync.service; then
-    echo "✅ 1password-connect-sync.service is running"
+if systemctl is-active --quiet 1passwordconnectsync.service; then
+    echo "✅ 1passwordconnectsync.service is running"
 else
-    echo "❌ 1password-connect-sync.service failed to start"
-    journalctl -u 1password-connect-sync.service -n 10 --no-pager
+    echo "❌ 1passwordconnectsync.service failed to start"
+    journalctl -u 1passwordconnectsync.service -n 10 --no-pager
     exit 1
 fi
 
 # Test API endpoint
 echo ""
 echo "🧪 Testing API endpoint..."
+sleep 2
 if curl -s -f -H "Accept: application/json" http://localhost:8080/health > /dev/null 2>&1; then
     echo "✅ API endpoint is responding"
 else
     echo "⚠️  API not yet ready (this is normal on first startup)"
-    echo "   Check logs with: sudo journalctl -u 1password-connect-api.service -f"
+    echo "   Check logs with: sudo journalctl -u 1passwordconnectapi.service -f"
 fi
 
 echo ""
@@ -111,9 +115,9 @@ echo "================================================"
 echo "✅ Deployment Complete!"
 echo ""
 echo "📝 Next Steps:"
-echo "   1. Verify logs: sudo journalctl -u 1password-connect-api.service -f"
+echo "   1. Verify logs: sudo journalctl -u 1passwordconnectapi.service -f"
 echo "   2. Test API: curl -H 'Accept: application/json' http://localhost:8080/v1/vaults"
 echo "   3. (Optional) Configure Nginx Proxy Manager for remote access"
 echo ""
-echo "📚 Documentation: See 1PASSWORD_SETUP.md"
+echo "📚 Documentation: See /1PASSWORD_SETUP.md"
 echo ""
