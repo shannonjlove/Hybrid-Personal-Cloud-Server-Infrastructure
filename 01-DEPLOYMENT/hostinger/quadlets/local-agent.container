@@ -8,7 +8,7 @@ ContainerName=local-agent
 PublishPort=100.115.66.75:8101:8000
 AddHost=host.containers.internal:host-gateway
 Environment=OLLAMA_URL=http://host.containers.internal:11434
-Environment=OLLAMA_MODEL=qwen2.5:7b
+Environment=OLLAMA_MODEL=neural-chat:7b
 Environment=MEMORY_AGENT_URL=http://100.115.66.75:8100
 
 [Service]
