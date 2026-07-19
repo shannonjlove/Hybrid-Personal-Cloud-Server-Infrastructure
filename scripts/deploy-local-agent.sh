@@ -8,7 +8,7 @@
 # infra (PaperParrot stack), Ollama is expected at port 11434 — confirm with:
 #   curl -s http://localhost:11434/api/tags
 # and pull a tool-calling-capable model before running this, e.g.:
-#   ollama pull qwen2.5:7b
+#   ollama pull neural-chat:7b
 
 set -euo pipefail
 
@@ -17,7 +17,7 @@ QUADLET_DIR="/etc/containers/systemd"
 TAILSCALE_IP="${TAILSCALE_IP:-100.115.66.75}"
 BIND_PORT="${BIND_PORT:-8101}"
 OLLAMA_URL="${OLLAMA_URL:-http://host.containers.internal:11434}"
-OLLAMA_MODEL="${OLLAMA_MODEL:-qwen2.5:7b}"
+OLLAMA_MODEL="${OLLAMA_MODEL:-neural-chat:7b}"
 MEMORY_AGENT_URL="${MEMORY_AGENT_URL:-http://${TAILSCALE_IP}:8100}"
 
 echo "==> Checking Ollama is reachable before deploying..."
