@@ -44,8 +44,11 @@ Nexus (100.115.66.75, public 72.61.74.250)
 sOs (100.67.229.94)
   ├── /mnt/shared-context  NFS-mounted from Nexus, same absolute path
   ├── claude-memory        Same stdio MCP server, same shared MEMORY_ROOT
-  └── WebTop               Podman Quadlet, lscr.io/linuxserver/webtop:ubuntu-xfce
-                           Always-on. Bind-mounts /mnt/shared-context at same path inside container.
+  ├── WebTop               Podman Quadlet, lscr.io/linuxserver/webtop:ubuntu-xfce
+  │                        Always-on. Bind-mounts /mnt/shared-context at same path inside container.
+  │
+  └── motionsites-prompt   Podman Quadlet for motionsites-prompt-collection
+                           Secondary workloads, Tailscale port 8102, ARM64-optimized
 ```
 
 ## Memory tools
@@ -63,8 +66,9 @@ sOs (100.67.229.94)
 - Source: `02-CONTAINERS/ai-mcp-servers/memory-agent/`
 
 **local-agent** (Nexus only, Tailscale port 8101, not public)
-- Recovers natural-language memory reasoning using local Ollama (qwen2.5:7b by default)
+- Recovers natural-language memory reasoning using local Ollama (neural-chat:7b — Hermes-based agentic model)
 - Talks to memory-agent's REST API as its tools — no duplicate file-safety logic
+- Model: neural-chat:7b (swappable via OLLAMA_MODEL environment variable)
 - Source: `02-CONTAINERS/ai-mcp-servers/local-agent/`
 
 ## Deployment order (Nexus first, then sOs)
@@ -73,8 +77,8 @@ sOs (100.67.229.94)
 # On Nexus — Step 0: memory-agent v2 (no API key, pure file CRUD)
 bash scripts/deploy-memory-agent-v2.sh
 
-# On Nexus — Step 0b: local-agent (Ollama-backed, free)
-# Prerequisite: Ollama running + ollama pull qwen2.5:7b
+# On Nexus — Step 0b: local-agent (Ollama-backed, free, neural-chat:7b model)
+# Prerequisite: Ollama running + ollama pull neural-chat:7b
 bash scripts/deploy-local-agent.sh
 
 # On Nexus — Step 1: shared context NFS + claude-memory
@@ -82,6 +86,10 @@ bash scripts/deploy-shared-context-nexus.sh
 
 # On sOs (after Nexus Step 1 completes) — Step 2
 bash scripts/deploy-shared-context-sos-webtop.sh
+
+# On sOs — Step 2b: motionsites-prompt-collection (secondary workloads, Tailscale-only)
+# Run with: sudo bash scripts/deploy-motionsites-sos.sh
+sudo bash scripts/deploy-motionsites-sos.sh
 
 # On Nexus — Step 3: NPM proxy host for memory.shannonjlove.cloud
 # Prerequisite: .env with NPM_EMAIL / NPM_PASSWORD / NPM_URL
@@ -110,24 +118,27 @@ The skill covers: MCP tool vs REST API decision logic, all six MCP commands, all
   claude-memory/server.py          <- stdio MCP server (memory_20250818 protocol)
   claude-memory/seed-memories/     <- seeded into MEMORY_ROOT on install
   memory-agent/                    <- FastAPI file CRUD (v2, no API key)
-  local-agent/                     <- Ollama-backed /chat service
+  local-agent/                     <- Ollama-backed /chat service (neural-chat:7b)
 01-DEPLOYMENT/hostinger/quadlets/  <- Nexus Quadlet unit files
   memory-agent.container
   local-agent.container
-01-DEPLOYMENT/oracle/quadlets/     <- sOs Quadlet unit files (webtop)
+01-DEPLOYMENT/oracle/quadlets/     <- sOs Quadlet unit files (webtop, motionsites)
 scripts/
   install-memory-tools.sh          <- ONE-SHOT: runs all Nexus steps in order (pull + deploy)
   deploy-memory-agent-v2.sh
   deploy-local-agent.sh
   deploy-shared-context-nexus.sh
   deploy-shared-context-sos-webtop.sh
+  deploy-motionsites-sos.sh        <- Deploy motionsites on sOs (ARM64, Tailscale-only)
   configure-npm-memory.sh
 05-DOCS/
   HANDOFF-memory-usage-workflow.md <- full memory usage reference (also at artifact link)
+  MIND-MIRROR.wiki/                <- Submodule: documentation template and wiki reference
 ios/scriptable/                    <- iPhone Scriptable JS files
 .claude/
   settings.json                    <- Claude Code MCP config (claude-memory server entry)
   memory-workflow.md               <- /memory-workflow Claude skill
+opt/motionsites-prompt-collection/ <- Runtime directory (on sOs, created by deploy script)
 ```
 
 ## Deployment gotchas (learned in practice)
